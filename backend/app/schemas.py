@@ -1,128 +1,237 @@
-"""Request and response bodies."""
+"""Request and response bodies of the API."""
 
-from datetime import date
+from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field
 
-from app.scheduler import parse_hhmm
+from app.content.schema import Block, GlossaryEntry
 
-
-class ProfileOut(BaseModel):
-    display_name: str
-    chunk_minutes: int
-    short_break: int
-    long_break: int
-    max_chunks_per_day: int
-    minutes_per_page: float
-    ui_prefs: dict
+ICONS = ("chart", "book", "flask", "calculator", "brain", "globe", "scale", "code")
 
 
-class ProfileUpdate(BaseModel):
-    display_name: str | None = Field(None, max_length=60)
-    chunk_minutes: int | None = Field(None, ge=15, le=45)
-    short_break: int | None = Field(None, ge=0, le=30)
-    long_break: int | None = Field(None, ge=5, le=60)
-    max_chunks_per_day: int | None = Field(None, ge=1, le=16)
-    minutes_per_page: float | None = Field(None, gt=0, le=30)
-    ui_prefs: dict | None = None
+# --- settings -------------------------------------------------------------
+
+class Settings(BaseModel):
+    """Display and sound settings. Only what the student chose: no diagnosis."""
+
+    fontScale: float = Field(1.0, ge=1.0, le=2.0)
+    lineSpacing: float = Field(1.6, ge=1.4, le=2.4)
+    highContrast: bool = False
+    reducedMotion: bool = False
+    readAloud: bool = True
+    autoRead: bool = True
+    voiceRate: float = Field(0.9, ge=0.5, le=1.5)
+    onboarded: bool = False
 
 
-class WindowIn(BaseModel):
-    weekday: int = Field(ge=0, le=6)
-    start: str
-    end: str
-
-    @field_validator("start", "end")
-    @classmethod
-    def valid_time(cls, v: str) -> str:
-        parse_hhmm(v)
-        return v
-
-    @model_validator(mode="after")
-    def end_after_start(self):
-        if parse_hhmm(self.end) <= parse_hhmm(self.start):
-            raise ValueError("Η ώρα λήξης πρέπει να είναι μετά την ώρα έναρξης")
-        return self
-
-
-class AvailabilityIn(BaseModel):
-    windows: list[WindowIn]
-    blocked_dates: list[date] = []
-
+# --- courses and chapters -------------------------------------------------
 
 class CourseIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    icon: Literal[ICONS] = "book"  # type: ignore[valid-type]
+
+
+class ProposalOut(BaseModel):
+    direction: Literal["up", "down"]
+    from_level: int
+    to_level: int
+    message: str
 
 
 class CourseOut(BaseModel):
     id: int
     name: str
+    icon: str
+    level: int
+    level_name: str
+    chapters: int
+    proposal: ProposalOut | None
 
 
-class TaskIn(BaseModel):
-    course_id: int
-    title: str = Field(min_length=1, max_length=200)
-    kind: str = Field(pattern="^(study|assignment)$")
-    deadline: date
-    pages: int | None = Field(None, gt=0, le=5000)
-    difficulty: int = Field(2, ge=1, le=3)
-    estimated_minutes: float | None = Field(None, gt=0, le=6000)
-    steps: list[str] = []
+class SectionSummary(BaseModel):
+    id: int
+    number: str | None
+    title: str
 
 
-class TaskUpdate(BaseModel):
-    title: str | None = Field(None, min_length=1, max_length=200)
-    deadline: date | None = None
-    estimated_minutes: float | None = Field(None, gt=0, le=6000)
-    steps: list[str] | None = None
-    done: bool | None = None
-
-
-class TaskOut(BaseModel):
+class DocumentOut(BaseModel):
     id: int
     course_id: int
-    course: str
     title: str
-    kind: str
-    base_minutes: float
-    deadline: date
-    steps: list[str]
+    filename: str
+    uploaded_at: datetime
+    start_level: int | None
+    suggested_level: int | None
+    sections: list[SectionSummary]
+
+
+class SuggestionOut(BaseModel):
+    level: int
+    level_name: str
+    reason: str
+
+
+class UploadOut(BaseModel):
+    document: DocumentOut
+    suggestion: SuggestionOut
+    current_level: int
+
+
+class LevelIn(BaseModel):
+    level: int = Field(ge=1, le=4)
+    reason: Literal["proposal", "manual", "new_chapter"] = "manual"
+
+
+# --- study ----------------------------------------------------------------
+
+class EasyOut(BaseModel):
+    blocks: list[Block]
+    glossary: list[GlossaryEntry]
+    source: str
+
+
+class StudyOut(BaseModel):
+    id: int
+    number: str | None
+    title: str
+    document_id: int
+    document_title: str
+    course_id: int
+    course_name: str
+    level: int
+    position: int  # 1-based
+    total: int
+    prev_id: int | None
+    next_id: int | None
+    original: list[str]
+    easy: EasyOut
+
+
+class ViewIn(BaseModel):
+    mode: Literal["easy", "original"]
+
+
+# --- questions ------------------------------------------------------------
+
+class OptionOut(BaseModel):
+    id: int
+    text: str
+    image: str | None
+
+
+class QuestionOut(BaseModel):
+    id: int
+    prompt: str
+    image: str | None
+    image_alt: str | None
+    mode: Literal["choice", "open"]
+    options: list[OptionOut]  # empty for open questions
+
+
+class LastStrategy(BaseModel):
+    choice: str
+    label: str
+
+
+class QuestionsOut(BaseModel):
+    section_id: int
+    course_id: int
+    level: int
+    questions: list[QuestionOut]
+    ask_strategy: bool  # level 3: ask "Τι σε βοήθησε;" at the end
+    last_strategy: LastStrategy | None
+
+
+class AttemptOut(BaseModel):
+    attempt_id: int
+    hints_used: int
+
+
+class HintOut(BaseModel):
+    step: int
+    text: str
+    action: str | None
+    section_id: int | None
+    choices: list[OptionOut]  # only for step 3: two choices
+    example: Block | None = None  # for "replay_example": the everyday example to hear again
+
+
+class AnswerIn(BaseModel):
+    option_id: int | None = None
+    text: str | None = Field(None, max_length=1000)
+
+
+class SelfCheckIn(BaseModel):
+    close: bool
+
+
+class FlagsIn(BaseModel):
+    listened: bool | None = None
+    opened_section: bool | None = None
+
+
+class AnswerOut(BaseModel):
+    outcome: Literal["correct", "try_again", "self_check", "explained", "not_yet"]
+    message: str
+    key_point: str | None  # only after the student has tried
     done: bool
+    proposal: ProposalOut | None = None
 
 
-class GenerateIn(BaseModel):
-    start_date: date | None = None
-    seed: int | None = None
+class StrategyIn(BaseModel):
+    choice: Literal["listen", "image", "example"]
 
 
-class ChunkOut(BaseModel):
-    id: int
-    work_item_id: int
-    title: str
-    course: str
-    kind: str
+# --- progress -------------------------------------------------------------
+
+class DayPoint(BaseModel):
     day: date
-    start: str
-    end: str
-    minutes: int
-    seq: int
-    status: str
-    help_requests: int
-    actual_minutes: float | None
+    questions: int
+    hints_per_question: float
 
 
-class UnscheduledOut(BaseModel):
-    work_item_id: int
-    title: str
-    minutes: int
+class WeekPoint(BaseModel):
+    label: str
+    start: date
+    end: date
+    questions: int
+    hints_per_question: float | None
 
 
-class ScheduleOut(BaseModel):
-    score: float
-    chunks: list[ChunkOut]
-    unscheduled: list[UnscheduledOut]
+class LevelStep(BaseModel):
+    at: datetime
+    from_level: int
+    to_level: int
 
 
-class FinishIn(BaseModel):
-    item_done: bool = False  # "the whole task is finished"
-    actual_minutes: float | None = Field(None, gt=0, le=600)  # if they forgot to press start
+class CourseProgress(BaseModel):
+    id: int
+    name: str
+    icon: str
+    level: int
+    level_name: str
+    days: list[DayPoint]
+    weeks: list[WeekPoint]
+    level_history: list[LevelStep]
+    message: str
+
+
+class ProgressOut(BaseModel):
+    simulated: bool
+    message: str
+    courses: list[CourseProgress]
+
+
+# --- supporter ------------------------------------------------------------
+
+class SupporterIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class SupporterOut(BaseModel):
+    id: int
+    name: str
+    token: str
+    created_at: datetime
+    active: bool

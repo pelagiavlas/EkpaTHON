@@ -8,11 +8,15 @@ from app.main import app
 
 
 @pytest.fixture
-def client():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def engine():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     init_db(engine)
+    return engine
+
+
+@pytest.fixture
+def client(engine, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.routers.courses.STORAGE_DIR", tmp_path)
 
     def override():
         with Session(engine) as session:

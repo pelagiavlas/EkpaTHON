@@ -1,115 +1,199 @@
+import hashlib
 import json
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlmodel import Session, delete, select
 
-from app.db import get_session
-from app.models import Chunk, Course, WorkItem
-from app.routers.profile import get_profile
-from app.scheduler import estimate_minutes
-from app.schemas import CourseIn, CourseOut, TaskIn, TaskOut, TaskUpdate
+from app.db import STORAGE_DIR, get_session
+from app.learning import service
+from app.learning.fading import LEVEL_NAMES
+from app.models import (
+    Attempt, ContentCache, Course, Document, LevelChange, Question, Section, StrategyNote, StudyView,
+)
+from app.pdf import PdfError, pdf_to_sections
+from app.schemas import (
+    CourseIn, CourseOut, DocumentOut, LevelIn, SectionSummary, StrategyIn, SuggestionOut, UploadOut,
+)
 
-router = APIRouter(tags=["courses & tasks"])
+router = APIRouter(tags=["courses & chapters"])
+
+MAX_PDF_BYTES = 20 * 1024 * 1024
+
+
+def get_or_404(session: Session, model, id: int, message: str):
+    row = session.get(model, id)
+    if row is None:
+        raise HTTPException(404, message)
+    return row
+
+
+def course_out(session: Session, course: Course) -> CourseOut:
+    chapters = len(session.exec(
+        select(Document.id).where(Document.course_id == course.id, Document.simulated == False)  # noqa: E712
+    ).all())
+    return CourseOut(
+        id=course.id, name=course.name, icon=course.icon, level=course.level,
+        level_name=LEVEL_NAMES[course.level], chapters=chapters, proposal=service.proposal_out(course),
+    )
+
+
+def document_out(session: Session, doc: Document) -> DocumentOut:
+    sections = session.exec(select(Section).where(Section.document_id == doc.id).order_by(Section.position))
+    return DocumentOut(
+        **doc.model_dump(include={"id", "course_id", "title", "filename", "uploaded_at", "start_level", "suggested_level"}),
+        sections=[SectionSummary(id=s.id, number=s.number, title=s.title) for s in sections],
+    )
 
 
 @router.get("/courses", response_model=list[CourseOut])
 def list_courses(session: Session = Depends(get_session)):
-    return session.exec(select(Course).order_by(Course.name)).all()
+    return [course_out(session, c) for c in session.exec(select(Course).order_by(Course.created_at))]
 
 
 @router.post("/courses", response_model=CourseOut, status_code=201)
 def create_course(body: CourseIn, session: Session = Depends(get_session)):
-    course = Course(name=body.name.strip())
+    course = Course(name=body.name.strip(), icon=body.icon)
     session.add(course)
     session.commit()
     session.refresh(course)
-    return course
+    return course_out(session, course)
+
+
+@router.get("/courses/{course_id}", response_model=CourseOut)
+def read_course(course_id: int, session: Session = Depends(get_session)):
+    return course_out(session, get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα"))
 
 
 @router.delete("/courses/{course_id}", status_code=204)
 def delete_course(course_id: int, session: Session = Depends(get_session)):
-    course = session.get(Course, course_id)
-    if course is None:
-        raise HTTPException(404, "Δεν βρέθηκε το μάθημα")
-    for item in session.exec(select(WorkItem).where(WorkItem.course_id == course_id)):
-        _delete_item(session, item)
+    course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
+    for doc in session.exec(select(Document).where(Document.course_id == course_id)):
+        _delete_document(session, doc)
+    for model in (Attempt, LevelChange, StrategyNote):
+        session.exec(delete(model).where(model.course_id == course_id))
     session.delete(course)
     session.commit()
 
 
-def task_out(item: WorkItem, course_name: str) -> TaskOut:
-    return TaskOut(
-        **item.model_dump(exclude={"steps", "pages", "difficulty", "created_at"}),
-        course=course_name,
-        steps=json.loads(item.steps),
+@router.post("/courses/{course_id}/level", response_model=CourseOut)
+def change_level(course_id: int, body: LevelIn, session: Session = Depends(get_session)):
+    course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
+    service.set_level(session, course, body.level, body.reason)
+    session.commit()
+    session.refresh(course)
+    return course_out(session, course)
+
+
+@router.post("/courses/{course_id}/proposal/decline", response_model=CourseOut)
+def decline_proposal(course_id: int, session: Session = Depends(get_session)):
+    course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
+    service.decline_proposal(session, course)
+    session.commit()
+    session.refresh(course)
+    return course_out(session, course)
+
+
+@router.post("/courses/{course_id}/strategy", status_code=204)
+def save_strategy(course_id: int, body: StrategyIn, session: Session = Depends(get_session)):
+    get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
+    session.add(StrategyNote(course_id=course_id, choice=body.choice))
+    session.commit()
+
+
+@router.get("/courses/{course_id}/documents", response_model=list[DocumentOut])
+def list_documents(course_id: int, session: Session = Depends(get_session)):
+    get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
+    docs = session.exec(
+        select(Document).where(Document.course_id == course_id, Document.simulated == False)  # noqa: E712
+        .order_by(Document.uploaded_at)
     )
+    return [document_out(session, d) for d in docs]
 
 
-def _get_item(session: Session, task_id: int) -> WorkItem:
-    item = session.get(WorkItem, task_id)
-    if item is None:
-        raise HTTPException(404, "Δεν βρέθηκε η εργασία")
-    return item
+def chapter_title(sections, filename: str) -> str:
+    first = sections[0]
+    if first.number is None and first.title != "Εισαγωγή":
+        return first.title
+    return Path(filename).stem.replace("_", " ").replace("-", " ")
 
 
-def _delete_item(session: Session, item: WorkItem) -> None:
-    session.exec(delete(Chunk).where(Chunk.work_item_id == item.id))
-    session.delete(item)
-
-
-@router.get("/tasks", response_model=list[TaskOut])
-def list_tasks(include_done: bool = False, session: Session = Depends(get_session)):
-    query = select(WorkItem, Course).join(Course).order_by(WorkItem.deadline)
-    if not include_done:
-        query = query.where(WorkItem.done == False)  # noqa: E712
-    return [task_out(item, course.name) for item, course in session.exec(query)]
-
-
-@router.post("/tasks", response_model=TaskOut, status_code=201)
-def create_task(body: TaskIn, session: Session = Depends(get_session)):
-    course = session.get(Course, body.course_id)
-    if course is None:
-        raise HTTPException(404, "Δεν βρέθηκε το μάθημα")
-    profile = get_profile(session)
+@router.post("/courses/{course_id}/documents", response_model=UploadOut, status_code=201)
+async def upload_document(course_id: int, file: UploadFile, session: Session = Depends(get_session)):
+    course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
+    data = await file.read(MAX_PDF_BYTES + 1)
+    if len(data) > MAX_PDF_BYTES:
+        raise HTTPException(413, "Το αρχείο είναι πολύ μεγάλο. Δοκίμασε ένα PDF μικρότερο από 20 MB.")
     try:
-        base = estimate_minutes(
-            body.kind, body.pages, body.difficulty, profile.minutes_per_page, body.estimated_minutes
-        )
-    except ValueError:
-        raise HTTPException(422, "Γράψε πόσα λεπτά νομίζεις ότι θα πάρει ή πόσες σελίδες είναι")
-    item = WorkItem(
-        course_id=course.id,
-        title=body.title.strip(),
-        kind=body.kind,
-        base_minutes=base,
-        deadline=body.deadline,
-        pages=body.pages,
-        difficulty=body.difficulty,
-        steps=json.dumps(body.steps, ensure_ascii=False),
+        sections = pdf_to_sections(data)
+    except PdfError as err:
+        raise HTTPException(422, str(err))
+    if not sections:
+        raise HTTPException(422, "Δεν βρήκα κείμενο σε αυτό το PDF. Δοκίμασε άλλο.")
+
+    sha = hashlib.sha256(data).hexdigest()
+    doc = session.exec(select(Document).where(Document.course_id == course_id, Document.sha256 == sha)).first()
+    if doc is None:
+        path = STORAGE_DIR / f"{sha}.pdf"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        filename = Path(file.filename or "kefalaio.pdf").name
+        doc = Document(course_id=course_id, filename=filename, title=chapter_title(sections, filename), sha256=sha, path=str(path))
+        session.add(doc)
+        session.flush()
+        for position, s in enumerate(sections):
+            session.add(Section(
+                document_id=doc.id, position=position, number=s.number, title=s.title,
+                paragraphs_json=json.dumps(s.paragraphs, ensure_ascii=False),
+            ))
+    suggestion = service.suggestion_for(session, course, doc.id)
+    doc.suggested_level = suggestion.level
+    session.add(doc)
+    session.commit()
+    session.refresh(doc)
+    return UploadOut(
+        document=document_out(session, doc),
+        suggestion=SuggestionOut(level=suggestion.level, level_name=LEVEL_NAMES[suggestion.level], reason=suggestion.reason),
+        current_level=course.level,
     )
-    session.add(item)
+
+
+@router.get("/documents/{document_id}", response_model=DocumentOut)
+def read_document(document_id: int, session: Session = Depends(get_session)):
+    return document_out(session, get_or_404(session, Document, document_id, "Δεν βρέθηκε το κεφάλαιο"))
+
+
+@router.post("/documents/{document_id}/start-level", response_model=CourseOut)
+def choose_start_level(document_id: int, body: LevelIn, session: Session = Depends(get_session)):
+    doc = get_or_404(session, Document, document_id, "Δεν βρέθηκε το κεφάλαιο")
+    course = session.get(Course, doc.course_id)
+    doc.start_level = body.level
+    session.add(doc)
+    if body.level != course.level:
+        service.set_level(session, course, body.level, "new_chapter")
     session.commit()
-    session.refresh(item)
-    return task_out(item, course.name)
+    session.refresh(course)
+    return course_out(session, course)
 
 
-@router.patch("/tasks/{task_id}", response_model=TaskOut)
-def update_task(task_id: int, body: TaskUpdate, session: Session = Depends(get_session)):
-    item = _get_item(session, task_id)
-    changes = body.model_dump(exclude_none=True)
-    if "estimated_minutes" in changes:
-        item.base_minutes = changes.pop("estimated_minutes")
-    if "steps" in changes:
-        item.steps = json.dumps(changes.pop("steps"), ensure_ascii=False)
-    for key, value in changes.items():
-        setattr(item, key, value)
-    session.add(item)
-    session.commit()
-    session.refresh(item)
-    return task_out(item, session.get(Course, item.course_id).name)
+def _delete_document(session: Session, doc: Document) -> None:
+    section_ids = list(session.exec(select(Section.id).where(Section.document_id == doc.id)))
+    if section_ids:
+        question_ids = list(session.exec(select(Question.id).where(Question.section_id.in_(section_ids))))
+        if question_ids:
+            session.exec(delete(Attempt).where(Attempt.question_id.in_(question_ids)))
+        for model in (Question, ContentCache, StudyView):
+            session.exec(delete(model).where(model.section_id.in_(section_ids)))
+    session.exec(delete(Attempt).where(Attempt.document_id == doc.id))
+    session.exec(delete(Section).where(Section.document_id == doc.id))
+    if doc.path:
+        others = session.exec(select(Document).where(Document.sha256 == doc.sha256, Document.id != doc.id)).first()
+        if others is None:
+            Path(doc.path).unlink(missing_ok=True)
+    session.delete(doc)
 
 
-@router.delete("/tasks/{task_id}", status_code=204)
-def delete_task(task_id: int, session: Session = Depends(get_session)):
-    _delete_item(session, _get_item(session, task_id))
+@router.delete("/documents/{document_id}", status_code=204)
+def delete_document(document_id: int, session: Session = Depends(get_session)):
+    _delete_document(session, get_or_404(session, Document, document_id, "Δεν βρέθηκε το κεφάλαιο"))
     session.commit()

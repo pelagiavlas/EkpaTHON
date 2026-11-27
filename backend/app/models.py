@@ -1,76 +1,122 @@
-"""Database tables. Single local student: the app runs on their own device,
-so there is no login and nothing personal leaves it."""
+"""Database tables. Everything stays on the student's device and belongs to them.
 
-from datetime import date, datetime
+No diagnosis or label about the person is stored anywhere: only the settings
+they chose and a support level per course that moves both ways.
+Rows marked `simulated` come from the demo script and are shown as such.
+"""
+
+from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
 
 class Profile(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    display_name: str = "Φοιτητής"
-    chunk_minutes: int = 30
-    short_break: int = 5
-    long_break: int = 15
-    max_chunks_per_day: int = 6
-    minutes_per_page: float = 3.0
-    ui_prefs: str = "{}"  # JSON: font size, dyslexia font, line spacing, reduced motion
-
-
-class AvailabilityWindow(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    weekday: int  # 0 = Monday
-    start: str  # "HH:MM"
-    end: str
-
-
-class BlockedDate(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    day: date = Field(unique=True)
+    settings_json: str = "{}"
 
 
 class Course(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
-
-
-class WorkItem(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    course_id: int = Field(foreign_key="course.id")
-    title: str
-    kind: str  # "study" | "assignment"
-    base_minutes: float  # estimate before the personal multiplier
-    deadline: date
-    pages: int | None = None
-    difficulty: int = 2
-    steps: str = "[]"  # JSON list of approved steps
-    done: bool = False
+    icon: str = "book"
+    level: int = 1  # support level 1 (full help) ... 4 (autonomy)
+    proposal: str | None = None  # "up" | "down" while waiting for the student's answer
+    # Only answers after the last level decision count for new proposals.
+    window_start: datetime = Field(default_factory=datetime.now)
     created_at: datetime = Field(default_factory=datetime.now)
 
 
-class KindStat(SQLModel, table=True):
-    """Per task kind: prediction multiplier and fading-support state."""
-
-    kind: str = Field(primary_key=True)
-    multiplier: float = 1.0
-    samples: int = 0
-    support_level: int = 3
-    success_streak: int = 0
-
-
-class Chunk(SQLModel, table=True):
-    """A planned study block. Started/finished times are the data for the
-    prediction model (StudyBuddy's ScheduledTask kept only LocalTime)."""
+class Document(SQLModel, table=True):
+    """One uploaded PDF = one chapter."""
 
     id: int | None = Field(default=None, primary_key=True)
-    work_item_id: int = Field(foreign_key="workitem.id", index=True)
-    kind: str  # "study" | "revision" | "assignment"
-    day: date = Field(index=True)
-    start_min: int
-    minutes: int  # planned length
-    seq: int = 1  # order within its work item
-    status: str = "upcoming"  # upcoming | in_progress | done | missed
-    started_at: datetime | None = None
+    course_id: int = Field(foreign_key="course.id", index=True)
+    filename: str
+    title: str = ""
+    sha256: str = Field(default="", index=True)
+    path: str = ""  # local file under storage/ ("" for simulated chapters)
+    suggested_level: int | None = None
+    start_level: int | None = None
+    simulated: bool = False
+    uploaded_at: datetime = Field(default_factory=datetime.now)
+
+
+class Section(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    document_id: int = Field(foreign_key="document.id", index=True)
+    position: int
+    number: str | None = None  # "3.2" when the heading is numbered
+    title: str
+    paragraphs_json: str  # original text, one entry per paragraph
+
+
+class ContentCache(SQLModel, table=True):
+    """Easy-to-Read version of a section, so a provider is asked only once."""
+
+    section_id: int = Field(foreign_key="section.id", primary_key=True)
+    easy_json: str
+
+
+class Question(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    section_id: int = Field(foreign_key="section.id", index=True)
+    level: int
+    position: int
+    content_json: str  # QuestionContent incl. answer and hints: never sent as a whole
+
+
+class Attempt(SQLModel, table=True):
+    """One student working on one question."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    question_id: int | None = Field(default=None, foreign_key="question.id")
+    course_id: int = Field(foreign_key="course.id", index=True)
+    document_id: int | None = Field(default=None, foreign_key="document.id")
+    level: int
+    hints_used: int = 0  # 0-4
+    wrong_tries: int = 0
+    correct: bool | None = None  # None while still open
+    self_checked: bool = False
+    awaiting_self_check: bool = False  # open answer sent, student compares with the key point
+    opened_section: bool = False
+    listened: bool = False
+    started_at: datetime = Field(default_factory=datetime.now)
     finished_at: datetime | None = None
-    actual_minutes: float | None = None
-    help_requests: int = 0
+    simulated: bool = False
+
+
+class StudyView(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    section_id: int = Field(foreign_key="section.id")
+    mode: str  # "easy" | "original"
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class LevelChange(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    from_level: int
+    to_level: int
+    reason: str  # "proposal" | "manual" | "new_chapter"
+    accepted: bool = True  # False = the student said "not now" to a proposal
+    created_at: datetime = Field(default_factory=datetime.now)
+    simulated: bool = False
+
+
+class StrategyNote(SQLModel, table=True):
+    """Answer to "Τι σε βοήθησε;" (level 3)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    choice: str  # "listen" | "image" | "example"
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class SupporterAccess(SQLModel, table=True):
+    """Read-only access to progress per course, given and revoked by the student."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    token: str = Field(index=True, unique=True)
+    created_at: datetime = Field(default_factory=datetime.now)
+    revoked_at: datetime | None = None
