@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" role="img" aria-label="Δύο ομάδες με 10 ανθρώπους. Η πρώτη πίνει 2 καφέδες, η δεύτερη 3.">
+<defs>
+  <g id="p"><circle cx="0" cy="-15" r="6.5" fill="#1b2a4a"/><path d="M-8,11 v-11 a8,8 0 0 1 16,0 v11 z" fill="#1b2a4a"/></g>
+  <g id="cup"><path d="M0,0 h26 v14 a13,13 0 0 1 -26,0 z" fill="#6b3e1f"/><path d="M26,4 a7,7 0 0 1 0,14" fill="none" stroke="#6b3e1f" stroke-width="3.5"/>
+    <path d="M7,-6 q-3,-5 0,-10 M15,-6 q-3,-5 0,-10" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round"/></g>
+</defs>
+<rect width="400" height="240" rx="16" fill="#ffffff"/>
+<rect x="16" y="16" width="176" height="208" rx="14" fill="none" stroke="#6b7280" stroke-width="2"/>
+<rect x="208" y="16" width="176" height="208" rx="14" fill="none" stroke="#6b7280" stroke-width="2"/>
+<use href="#p" transform="translate(44,66) scale(1)"/><use href="#p" transform="translate(74,66) scale(1)"/><use href="#p" transform="translate(104,66) scale(1)"/><use href="#p" transform="translate(134,66) scale(1)"/><use href="#p" transform="translate(164,66) scale(1)"/><use href="#p" transform="translate(44,114) scale(1)"/><use href="#p" transform="translate(74,114) scale(1)"/><use href="#p" transform="translate(104,114) scale(1)"/><use href="#p" transform="translate(134,114) scale(1)"/><use href="#p" transform="translate(164,114) scale(1)"/><use href="#p" transform="translate(236,66) scale(1)"/><use href="#p" transform="translate(266,66) scale(1)"/><use href="#p" transform="translate(296,66) scale(1)"/><use href="#p" transform="translate(326,66) scale(1)"/><use href="#p" transform="translate(356,66) scale(1)"/><use href="#p" transform="translate(236,114) scale(1)"/><use href="#p" transform="translate(266,114) scale(1)"/><use href="#p" transform="translate(296,114) scale(1)"/><use href="#p" transform="translate(326,114) scale(1)"/><use href="#p" transform="translate(356,114) scale(1)"/>
+<use href="#cup" transform="translate(52,160)"/><text x="130" y="190" font-family="Segoe UI, Arial, sans-serif" font-size="44" font-weight="800" fill="#111418" text-anchor="middle">2</text>
+<use href="#cup" transform="translate(244,160)"/><text x="322" y="190" font-family="Segoe UI, Arial, sans-serif" font-size="44" font-weight="800" fill="#111418" text-anchor="middle">3</text>
+</svg>

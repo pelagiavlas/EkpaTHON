@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" role="img" aria-label="Το διάστημα μικραίνει.">
+<defs>
+  <g id="p"><circle cx="0" cy="-15" r="6.5" fill="#1b2a4a"/><path d="M-8,11 v-11 a8,8 0 0 1 16,0 v11 z" fill="#1b2a4a"/></g>
+  <g id="cup"><path d="M0,0 h26 v14 a13,13 0 0 1 -26,0 z" fill="#6b3e1f"/><path d="M26,4 a7,7 0 0 1 0,14" fill="none" stroke="#6b3e1f" stroke-width="3.5"/>
+    <path d="M7,-6 q-3,-5 0,-10 M15,-6 q-3,-5 0,-10" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round"/></g>
+</defs>
+<rect width="400" height="240" rx="16" fill="#ffffff"/>
+<line x1="40" y1="150" x2="360" y2="150" stroke="#111418" stroke-width="3" stroke-linecap="round"/><rect x="165" y="101" width="70" height="18" rx="9" fill="#0a3d8f"/><line x1="70" y1="110" x2="148" y2="110" stroke="#111418" stroke-width="4" stroke-linecap="round"/>
+<path d="M152,110 l-14,-9 v18 z" fill="#111418"/><line x1="330" y1="110" x2="252" y2="110" stroke="#111418" stroke-width="4" stroke-linecap="round"/>
+<path d="M248,110 l14,-9 v18 z" fill="#111418"/>
+</svg>
