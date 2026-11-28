@@ -20,7 +20,7 @@ def test_upload_creates_sections(client, tmp_path):
     course = make_course(client)
     r = upload(client, course)
     assert r.status_code == 201
-    doc = r.json()["document"]
+    doc = r.json()
     assert [(s["number"], s["title"]) for s in doc["sections"]] == [("1", "Εισαγωγή"), ("1.1", "Μέση τιμή")]
     assert len(list(tmp_path.glob("*.pdf"))) == 1  # stored locally only
 
@@ -30,8 +30,8 @@ def test_upload_creates_sections(client, tmp_path):
 
 def test_same_pdf_twice_is_not_duplicated(client):
     course = make_course(client)
-    first = upload(client, course).json()["document"]
-    second = upload(client, course).json()["document"]
+    first = upload(client, course).json()
+    second = upload(client, course).json()
     assert first["id"] == second["id"]
     assert len(client.get(f"/api/courses/{course}/documents").json()) == 1
 
@@ -50,7 +50,7 @@ def test_not_a_pdf_message(client):
 
 def test_delete_document_removes_file(client, tmp_path):
     course = make_course(client)
-    doc = upload(client, course).json()["document"]
+    doc = upload(client, course).json()
     assert client.delete(f"/api/documents/{doc['id']}").status_code == 204
     assert list(tmp_path.glob("*.pdf")) == []
     assert client.get(f"/api/sections/{doc['sections'][0]['id']}/study").status_code == 404

@@ -9,12 +9,11 @@ from app.db import STORAGE_DIR, get_session
 from app.learning import service
 from app.learning.fading import LEVEL_NAMES
 from app.models import (
-    Attempt, ContentCache, Course, Document, LevelChange, Question, Section, StrategyNote, StudyView,
+    Attempt, ContentCache, Course, Document, LevelChange, Milestone, Question, Section, SectionNote, SectionSupport,
+    StrategyNote, Visit,
 )
 from app.pdf import PdfError, pdf_to_sections
-from app.schemas import (
-    CourseIn, CourseOut, DocumentOut, LevelIn, SectionSummary, StrategyIn, SuggestionOut, UploadOut,
-)
+from app.schemas import CourseIn, CourseOut, DocumentOut, SectionSummary, StrategyIn
 
 router = APIRouter(tags=["courses & chapters"])
 
@@ -29,20 +28,28 @@ def get_or_404(session: Session, model, id: int, message: str):
 
 
 def course_out(session: Session, course: Course) -> CourseOut:
-    chapters = len(session.exec(
+    docs = session.exec(
         select(Document.id).where(Document.course_id == course.id, Document.simulated == False)  # noqa: E712
-    ).all())
-    return CourseOut(
-        id=course.id, name=course.name, icon=course.icon, level=course.level,
-        level_name=LEVEL_NAMES[course.level], chapters=chapters, proposal=service.proposal_out(course),
-    )
+    ).all()
+    waiting = session.exec(
+        select(SectionSupport).join(Section, Section.id == SectionSupport.section_id)
+        .join(Document, Document.id == Section.document_id)
+        .where(Document.course_id == course.id, SectionSupport.proposal_to != None)  # noqa: E711
+    ).all()
+    return CourseOut(id=course.id, name=course.name, icon=course.icon, chapters=len(docs), proposals=len(waiting))
 
 
 def document_out(session: Session, doc: Document) -> DocumentOut:
     sections = session.exec(select(Section).where(Section.document_id == doc.id).order_by(Section.position))
+    summaries = []
+    for s in sections:
+        sup = service.support(session, s.id)
+        summaries.append(SectionSummary(
+            id=s.id, number=s.number, title=s.title, level=sup.level, level_name=LEVEL_NAMES[sup.level],
+            has_proposal=service.proposal_out(sup) is not None,
+        ))
     return DocumentOut(
-        **doc.model_dump(include={"id", "course_id", "title", "filename", "uploaded_at", "start_level", "suggested_level"}),
-        sections=[SectionSummary(id=s.id, number=s.number, title=s.title) for s in sections],
+        **doc.model_dump(include={"id", "course_id", "title", "filename", "uploaded_at"}), sections=summaries,
     )
 
 
@@ -70,28 +77,10 @@ def delete_course(course_id: int, session: Session = Depends(get_session)):
     course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
     for doc in session.exec(select(Document).where(Document.course_id == course_id)):
         _delete_document(session, doc)
-    for model in (Attempt, LevelChange, StrategyNote):
+    for model in (Attempt, StrategyNote):
         session.exec(delete(model).where(model.course_id == course_id))
     session.delete(course)
     session.commit()
-
-
-@router.post("/courses/{course_id}/level", response_model=CourseOut)
-def change_level(course_id: int, body: LevelIn, session: Session = Depends(get_session)):
-    course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
-    service.set_level(session, course, body.level, body.reason)
-    session.commit()
-    session.refresh(course)
-    return course_out(session, course)
-
-
-@router.post("/courses/{course_id}/proposal/decline", response_model=CourseOut)
-def decline_proposal(course_id: int, session: Session = Depends(get_session)):
-    course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
-    service.decline_proposal(session, course)
-    session.commit()
-    session.refresh(course)
-    return course_out(session, course)
 
 
 @router.post("/courses/{course_id}/strategy", status_code=204)
@@ -107,8 +96,10 @@ def list_documents(course_id: int, session: Session = Depends(get_session)):
     docs = session.exec(
         select(Document).where(Document.course_id == course_id, Document.simulated == False)  # noqa: E712
         .order_by(Document.uploaded_at)
-    )
-    return [document_out(session, d) for d in docs]
+    ).all()
+    out = [document_out(session, d) for d in docs]
+    session.commit()
+    return out
 
 
 def chapter_title(sections, filename: str) -> str:
@@ -118,8 +109,10 @@ def chapter_title(sections, filename: str) -> str:
     return Path(filename).stem.replace("_", " ").replace("-", " ")
 
 
-@router.post("/courses/{course_id}/documents", response_model=UploadOut, status_code=201)
+@router.post("/courses/{course_id}/documents", response_model=DocumentOut, status_code=201)
 async def upload_document(course_id: int, file: UploadFile, session: Session = Depends(get_session)):
+    """Straight to the sections: every new section starts at level 1, no placement question.
+    A section on a topic already studied in this course gets a PROPOSAL, never a silent change."""
     course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
     data = await file.read(MAX_PDF_BYTES + 1)
     if len(data) > MAX_PDF_BYTES:
@@ -142,48 +135,34 @@ async def upload_document(course_id: int, file: UploadFile, session: Session = D
         session.add(doc)
         session.flush()
         for position, s in enumerate(sections):
-            session.add(Section(
+            row = Section(
                 document_id=doc.id, position=position, number=s.number, title=s.title,
                 paragraphs_json=json.dumps(s.paragraphs, ensure_ascii=False),
-            ))
-    suggestion = service.suggestion_for(session, course, doc.id)
-    doc.suggested_level = suggestion.level
-    session.add(doc)
+            )
+            session.add(row)
+            session.flush()
+            session.add(SectionSupport(section_id=row.id))
+            session.flush()
+            service.propose_same_topic(session, row, course.id)
     session.commit()
     session.refresh(doc)
-    return UploadOut(
-        document=document_out(session, doc),
-        suggestion=SuggestionOut(level=suggestion.level, level_name=LEVEL_NAMES[suggestion.level], reason=suggestion.reason),
-        current_level=course.level,
-    )
+    return document_out(session, doc)
 
 
 @router.get("/documents/{document_id}", response_model=DocumentOut)
 def read_document(document_id: int, session: Session = Depends(get_session)):
-    return document_out(session, get_or_404(session, Document, document_id, "Δεν βρέθηκε το κεφάλαιο"))
-
-
-@router.post("/documents/{document_id}/start-level", response_model=CourseOut)
-def choose_start_level(document_id: int, body: LevelIn, session: Session = Depends(get_session)):
-    doc = get_or_404(session, Document, document_id, "Δεν βρέθηκε το κεφάλαιο")
-    course = session.get(Course, doc.course_id)
-    doc.start_level = body.level
-    session.add(doc)
-    if body.level != course.level:
-        service.set_level(session, course, body.level, "new_chapter")
+    out = document_out(session, get_or_404(session, Document, document_id, "Δεν βρέθηκε το κεφάλαιο"))
     session.commit()
-    session.refresh(course)
-    return course_out(session, course)
+    return out
 
 
 def _delete_document(session: Session, doc: Document) -> None:
     section_ids = list(session.exec(select(Section.id).where(Section.document_id == doc.id)))
     if section_ids:
-        question_ids = list(session.exec(select(Question.id).where(Question.section_id.in_(section_ids))))
-        if question_ids:
-            session.exec(delete(Attempt).where(Attempt.question_id.in_(question_ids)))
-        for model in (Question, ContentCache, StudyView):
+        session.exec(delete(Attempt).where(Attempt.section_id.in_(section_ids)))
+        for model in (Question, ContentCache, Visit, LevelChange, SectionNote, SectionSupport):
             session.exec(delete(model).where(model.section_id.in_(section_ids)))
+        session.exec(delete(Milestone).where(Milestone.section_id.in_(section_ids)))
     session.exec(delete(Attempt).where(Attempt.document_id == doc.id))
     session.exec(delete(Section).where(Section.document_id == doc.id))
     if doc.path:

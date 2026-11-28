@@ -1,25 +1,40 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Plus, Save } from "lucide-react";
+import { Check, ChevronRight, Plus, Save, Settings as SettingsIcon } from "lucide-react";
 import { api, errorText } from "../api";
 import { Screen } from "../components/Screen";
-import { COURSE_ICONS, CourseIcon, LevelSteps, Loading, Notice } from "../components/common";
+import { COURSE_ICONS, CourseIcon, Loading, Notice } from "../components/common";
 import { useSettings } from "../settings";
 import type { Course } from "../types";
 import { useLoad } from "../useLoad";
+
+/** One quiet tip on first use instead of a questionnaire. Closes with one tap. */
+function FirstTip() {
+  const { settings, loaded, update } = useSettings();
+  if (!loaded || settings.onboarded) return null;
+  return (
+    <Notice icon={SettingsIcon}>
+      <p>
+        Μπορείς να αλλάξεις γράμματα, χρώματα και ήχο όποτε θέλεις, στις <Link to="/settings">Ρυθμίσεις</Link>.
+      </p>
+      <button type="button" className="btn" onClick={() => update({ onboarded: true })}>
+        <Check aria-hidden="true" />
+        Εντάξει
+      </button>
+    </Notice>
+  );
+}
 
 export function Courses() {
   const { data: courses, error } = useLoad<Course[]>("/courses");
   const { settings } = useSettings();
   const navigate = useNavigate();
 
-  const listen = [
-    { text: "Τα μαθήματά μου." },
-    ...(courses ?? []).map((c) => ({ text: `${c.name}. Επίπεδο ${c.level} από 4: ${c.level_name}.` })),
-  ];
+  const listen = [{ text: "Τα μαθήματά μου." }, ...(courses ?? []).map((c) => ({ text: `${c.name}.` }))];
 
   return (
     <Screen title="Τα μαθήματά μου" listen={listen} autoRead={settings.autoRead && !!courses}>
+      <FirstTip />
       {error && <Notice tone="error" live>{error}</Notice>}
       {!courses && !error && <Loading />}
       {courses?.length === 0 && <p className="lead">Δεν έχεις ακόμα μαθήματα. Πρόσθεσε το πρώτο σου μάθημα.</p>}
@@ -31,8 +46,8 @@ export function Courses() {
                 <CourseIcon name={c.icon} />
                 <span className="card-body">
                   <span className="card-title">{c.name}</span>
-                  <LevelSteps level={c.level} compact />
-                  {c.proposal && <span className="badge">Έχεις μια πρόταση</span>}
+                  <span>{c.chapters === 1 ? "1 κεφάλαιο" : `${c.chapters} κεφάλαια`}</span>
+                  {c.proposals > 0 && <span className="badge">Έχεις πρόταση</span>}
                 </span>
                 <ChevronRight aria-hidden="true" />
               </Link>

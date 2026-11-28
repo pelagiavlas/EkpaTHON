@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 from app.db import get_session
 from app.learning import service
-from app.models import Course, Profile, SupporterAccess
+from app.models import Course, Milestone, Profile, SupporterAccess
 from app.routers.courses import get_or_404
 from app.schemas import ProgressOut, Settings, SupporterIn, SupporterOut
 
@@ -18,16 +18,26 @@ router = APIRouter(tags=["progress, settings & supporter"])
 
 def build_progress(session: Session, today: date, impersonal: bool = False) -> ProgressOut:
     courses = session.exec(select(Course).order_by(Course.created_at)).all()
+    milestones = [] if impersonal else session.exec(select(Milestone).order_by(Milestone.created_at)).all()
     return ProgressOut(
         simulated=service.has_simulated_data(session),
         message=service.overall_message(session, today, impersonal),
         courses=[service.course_progress(session, c, today, impersonal) for c in courses],
+        milestones=[service.milestone_out(m) for m in milestones],
     )
 
 
 @router.get("/progress", response_model=ProgressOut)
 def progress(session: Session = Depends(get_session)):
     return build_progress(session, date.today())
+
+
+@router.post("/milestones/{key}/seen", status_code=204)
+def milestone_seen(key: str, session: Session = Depends(get_session)):
+    milestone = get_or_404(session, Milestone, key, "Δεν βρέθηκε")
+    milestone.seen = True
+    session.add(milestone)
+    session.commit()
 
 
 # --- settings ------------------------------------------------------------------

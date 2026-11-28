@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  Accessibility, Check, ChevronRight, Contrast, Footprints, RotateCcw, Type, UserRound, Volume2, type LucideIcon,
+  Accessibility, Check, ChevronRight, Contrast, Footprints, Type, UserRound, Volume2, type LucideIcon,
 } from "lucide-react";
 import { Screen } from "../components/Screen";
 import { Notice } from "../components/common";
@@ -15,7 +15,6 @@ const MENU: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/settings/sound", label: "Ανάγνωση φωναχτά", icon: Volume2 },
   { to: "/settings/motion", label: "Κίνηση", icon: Footprints },
   { to: "/settings/supporter", label: "Υποστηρικτής", icon: UserRound },
-  { to: "/welcome", label: "Οι πρώτες ερωτήσεις ξανά", icon: RotateCcw },
   { to: "/accessibility", label: "Δήλωση προσβασιμότητας", icon: Accessibility },
 ];
 

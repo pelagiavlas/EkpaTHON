@@ -11,27 +11,42 @@ export interface Settings {
   onboarded: boolean;
 }
 
+export interface Milestone {
+  key: string;
+  text: string;
+  created_at: string;
+}
+
 export interface Proposal {
-  direction: "up" | "down";
+  reason: string;
   from_level: number;
   to_level: number;
   message: string;
+}
+
+export interface Support {
+  section_id: number;
+  level: number;
+  level_name: string;
+  proposal: Proposal | null;
+  new_milestones: Milestone[];
 }
 
 export interface Course {
   id: number;
   name: string;
   icon: string;
-  level: number;
-  level_name: string;
   chapters: number;
-  proposal: Proposal | null;
+  proposals: number;
 }
 
 export interface SectionSummary {
   id: number;
   number: string | null;
   title: string;
+  level: number;
+  level_name: string;
+  has_proposal: boolean;
 }
 
 export interface Chapter {
@@ -40,15 +55,7 @@ export interface Chapter {
   title: string;
   filename: string;
   uploaded_at: string;
-  start_level: number | null;
-  suggested_level: number | null;
   sections: SectionSummary[];
-}
-
-export interface Upload {
-  document: Chapter;
-  suggestion: { level: number; level_name: string; reason: string };
-  current_level: number;
 }
 
 export interface Block {
@@ -75,13 +82,14 @@ export interface Study {
   document_title: string;
   course_id: number;
   course_name: string;
-  level: number;
+  support: Support;
   position: number;
   total: number;
   prev_id: number | null;
   next_id: number | null;
   original: string[];
   easy: { blocks: Block[]; glossary: GlossaryEntry[]; source: string };
+  demo: boolean;
 }
 
 export interface Option {
@@ -103,18 +111,30 @@ export interface Questions {
   section_id: number;
   course_id: number;
   level: number;
+  exam: boolean;
   questions: Question[];
   ask_strategy: boolean;
   last_strategy: { choice: string; label: string } | null;
 }
 
 export interface Hint {
+  kind: "explain" | "search";
   step: number;
   text: string;
-  action: "open_section" | "replay_example" | null;
+  action: "open_section" | "replay_example" | "open_original" | "highlight_paragraph" | "pick_sentence" | null;
   section_id: number | null;
+  paragraph: number | null;
+  sentences: string[];
   choices: Option[];
   example: Block | null;
+  fell_back: boolean;
+}
+
+export interface PickResult {
+  correct: boolean;
+  message: string;
+  fallback_hint: Hint | null;
+  new_milestones: Milestone[];
 }
 
 export interface AnswerResult {
@@ -123,6 +143,14 @@ export interface AnswerResult {
   key_point: string | null;
   done: boolean;
   proposal: Proposal | null;
+  new_milestones: Milestone[];
+}
+
+export interface Note {
+  id: number;
+  kind: string;
+  text: string;
+  created_at: string;
 }
 
 export interface WeekPoint {
@@ -137,11 +165,10 @@ export interface CourseProgress {
   id: number;
   name: string;
   icon: string;
-  level: number;
-  level_name: string;
+  chapters: { title: string; sections: { id: number; label: string; level: number; level_name: string }[] }[];
   days: { day: string; questions: number; hints_per_question: number }[];
   weeks: WeekPoint[];
-  level_history: { at: string; from_level: number; to_level: number }[];
+  level_history: { at: string; section: string; from_level: number; to_level: number }[];
   message: string;
 }
 
@@ -149,6 +176,7 @@ export interface Progress {
   simulated: boolean;
   message: string;
   courses: CourseProgress[];
+  milestones: Milestone[];
 }
 
 export interface Supporter {

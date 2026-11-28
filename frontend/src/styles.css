@@ -1022,3 +1022,181 @@ figure {
     min-width: 22rem;
   }
 }
+
+/* ---- support levels per section ---- */
+
+.level-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.term-btn {
+  display: inline;
+  min-height: 44px;
+  padding: 0.15rem 0.2rem;
+  margin: 0 -0.2rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.term-btn dfn {
+  text-decoration-style: dotted;
+}
+.term-btn[aria-expanded="true"] dfn {
+  text-decoration-style: solid;
+}
+.term-btn:hover {
+  background: var(--primary-soft);
+}
+
+/* The original text: numbered paragraphs, so "2η παράγραφος" is easy to find. */
+.original-paras {
+  padding-left: 2rem;
+  margin: 0.5rem 0;
+}
+.original-paras > li {
+  margin: 0 0 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 10px;
+}
+.original-paras > li::marker {
+  font-weight: 800;
+  color: var(--muted);
+}
+.original-paras > li > p {
+  margin: 0;
+}
+.para-here {
+  border: 3px solid var(--primary);
+  background: var(--primary-soft);
+}
+.here-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 0 0 0.4rem;
+}
+.here-label svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+/* Every sentence is a real button: keyboard, screen reader, visible focus, 44px target. */
+.sentence-group {
+  display: grid;
+  gap: 0.5rem;
+}
+.sentence-btn {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  line-height: var(--line-height);
+  text-align: left;
+  cursor: pointer;
+}
+.sentence-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.sentence-btn.is-tried {
+  border-style: dashed;
+  background: var(--surface);
+  cursor: not-allowed;
+}
+.sentence-btn.is-found {
+  border: 3px solid var(--success);
+  background: var(--success-bg);
+}
+.sentence-btn.is-found svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--success);
+  flex: none;
+}
+.sentence-note {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.hint-search {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.hint-search .hint-step svg {
+  color: var(--primary);
+}
+
+.preview-panel {
+  border-style: dashed;
+}
+.preview-panel h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.chapter-levels {
+  margin: 0.75rem 0;
+}
+.chapter-title {
+  font-weight: 800;
+  margin-bottom: 0.4rem;
+}
+.section-levels {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.section-levels li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--border-soft);
+  border-radius: 10px;
+}
+.section-name {
+  font-weight: 600;
+}
+.own-text {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+}
+.timer [role="timer"] {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+select {
+  min-height: 3rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+}
+h2 > svg,
+h3 > svg {
+  width: 1.4em;
+  height: 1.4em;
+  flex: none;
+}

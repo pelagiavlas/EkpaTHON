@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { Lightbulb, Pin } from "lucide-react";
 import type { Block, GlossaryEntry } from "../types";
 import { Pictogram } from "./common";
@@ -10,8 +10,25 @@ function glossMap(glossary: GlossaryEntry[]) {
   return new Map(glossary.map((g) => [g.term.toLowerCase(), g.gloss]));
 }
 
-/** Text with academic terms kept, and a simple explanation right next to them. */
-export function TermText({ text, glossary }: { text: string; glossary: GlossaryEntry[] }) {
+/** "inline": the explanation is always next to the term (level 1).
+ *  "tap": the term is a button, the explanation opens when pressed (level 2 and up). */
+export type TermMode = "inline" | "tap";
+
+function TapTerm({ shown, gloss }: { shown: string; gloss: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="term">
+      <button type="button" className="term-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <dfn>{shown}</dfn>
+        <span className="sr-only">, δες τι σημαίνει</span>
+      </button>
+      {open && <span className="gloss"> ({gloss})</span>}
+    </span>
+  );
+}
+
+/** Text with academic terms kept, and a simple explanation for them. */
+export function TermText({ text, glossary, mode = "inline" }: { text: string; glossary: GlossaryEntry[]; mode?: TermMode }) {
   const glosses = glossMap(glossary);
   const out = [];
   let last = 0;
@@ -20,10 +37,14 @@ export function TermText({ text, glossary }: { text: string; glossary: GlossaryE
     out.push(text.slice(last, match.index));
     const gloss = glosses.get((key ?? shown).toLowerCase());
     out.push(
-      <span className="term" key={match.index}>
-        <dfn>{shown}</dfn>
-        {gloss && <span className="gloss"> ({gloss})</span>}
-      </span>,
+      gloss && mode === "tap" ? (
+        <TapTerm key={match.index} shown={shown} gloss={gloss} />
+      ) : (
+        <span className="term" key={match.index}>
+          <dfn>{shown}</dfn>
+          {gloss && <span className="gloss"> ({gloss})</span>}
+        </span>
+      ),
     );
     last = (match.index ?? 0) + whole.length;
   }
@@ -43,8 +64,12 @@ export function speakable(text: string, glossary: GlossaryEntry[], said: Set<str
   });
 }
 
+/** Level 1: a picture for every idea. Level 2 and up: pictures only for the hard ideas. */
 export function visibleBlocks(blocks: Block[], level: number): Block[] {
-  return blocks.filter((b) => b.type !== "image" || b.essential || level < 3);
+  if (level <= 1) return blocks;
+  return blocks
+    .filter((b) => b.type !== "image" || b.essential)
+    .map((b) => (b.type === "example" && !b.essential ? { ...b, image: null } : b));
 }
 
 export function blockSpeech(blocks: Block[], glossary: GlossaryEntry[], idPrefix = "b", offset = 0): SpeechPart[] {
@@ -66,11 +91,12 @@ export function blockSpeech(blocks: Block[], glossary: GlossaryEntry[], idPrefix
   });
 }
 
-export function EasyBlocks({ blocks, glossary, idPrefix = "b", offset = 0 }: {
+export function EasyBlocks({ blocks, glossary, idPrefix = "b", offset = 0, termMode = "inline" }: {
   blocks: Block[];
   glossary: GlossaryEntry[];
   idPrefix?: string;
   offset?: number; // index of the first block in the whole section, so ids stay unique across pages
+  termMode?: TermMode;
 }) {
   const { currentId } = useSpeech();
   return (
@@ -87,7 +113,7 @@ export function EasyBlocks({ blocks, glossary, idPrefix = "b", offset = 0 }: {
                   {b.title ?? "Παράδειγμα"}
                 </figcaption>
                 <p>
-                  <TermText text={b.text} glossary={glossary} />
+                  <TermText text={b.text} glossary={glossary} mode={termMode} />
                 </p>
                 {b.image && <Pictogram name={b.image} alt={b.alt ?? ""} />}
               </figure>
@@ -124,14 +150,14 @@ export function EasyBlocks({ blocks, glossary, idPrefix = "b", offset = 0 }: {
               <p key={id} id={id} className={r("block key")}>
                 <Pin aria-hidden="true" />
                 <strong>
-                  <TermText text={b.text} glossary={glossary} />
+                  <TermText text={b.text} glossary={glossary} mode={termMode} />
                 </strong>
               </p>
             );
           default:
             return (
               <p key={id} id={id} className={r("block")}>
-                <TermText text={b.text} glossary={glossary} />
+                <TermText text={b.text} glossary={glossary} mode={termMode} />
               </p>
             );
         }
@@ -140,8 +166,9 @@ export function EasyBlocks({ blocks, glossary, idPrefix = "b", offset = 0 }: {
   );
 }
 
-/** Small pages: an example closes a page; at most 4 short paragraphs per page. */
-export function paginate(blocks: Block[]): Block[][] {
+/** Pages: a picture or example closes a page at level 1; at most `maxTexts` paragraphs per page
+ *  (level 1: 3, small parts; level 2 and up: 6, bigger parts). */
+export function paginate(blocks: Block[], maxTexts = 3, visualEndsPage = true): Block[][] {
   const pages: Block[][] = [];
   let page: Block[] = [];
   let texts = 0;
@@ -149,8 +176,8 @@ export function paginate(blocks: Block[]): Block[][] {
     page.push(b);
     if (b.type === "text") texts += 1;
     const next = blocks[i + 1];
-    const endsVisual = (b.type === "example" || b.type === "image" || b.type === "formula") && next?.type !== "image";
-    if (endsVisual || texts >= 4) {
+    const endsVisual = visualEndsPage && (b.type === "example" || b.type === "image" || b.type === "formula") && next?.type !== "image";
+    if (endsVisual || texts >= maxTexts) {
       pages.push(page);
       page = [];
       texts = 0;

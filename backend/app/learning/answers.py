@@ -17,6 +17,8 @@ SELF_CHECK = "Δες τι περιμέναμε. Είναι κοντά σε αυ�
 SELF_CHECK_YES = "Ωραία. Το βρήκες."
 SELF_CHECK_NO = "Εντάξει. Τώρα το ξέρεις για την επόμενη φορά."
 EXPLAINED = "Ας το δούμε μαζί."
+KEYPOINTS_YES = "Ωραία. Τα βασικά σημεία τα είχες."
+KEYPOINTS_NO = "Εντάξει. Τώρα τα έχεις όλα μπροστά σου."
 
 
 def matches_open_answer(question: QuestionContent, answer: str) -> bool:

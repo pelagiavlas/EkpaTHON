@@ -1,4 +1,4 @@
-"""Settings from config.toml (fading rules and prediction thresholds)."""
+"""Settings from config.toml (fading rules, search hints)."""
 
 import tomllib
 from dataclasses import dataclass
@@ -15,20 +15,16 @@ class FadingConfig:
     down_window: int = 3
     down_struggles: int = 2
     struggle_min_hints: int = 3
+    easy_down: int = 2
+    easy_window: int = 3
 
 
 @dataclass(frozen=True)
-class PredictionConfig:
-    recency_decay: float = 0.5
-    wrong_weight: float = 2.0
-    thresholds: tuple[float, float, float] = (0.75, 1.5, 2.5)
-    max_step_up: int = 1
+class SearchConfig:
+    max_wrong_picks: int = 3
 
 
 @lru_cache
-def load_config(path: Path = CONFIG_PATH) -> tuple[FadingConfig, PredictionConfig]:
+def load_config(path: Path = CONFIG_PATH) -> tuple[FadingConfig, SearchConfig]:
     data = tomllib.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    prediction = dict(data.get("prediction", {}))
-    if "thresholds" in prediction:
-        prediction["thresholds"] = tuple(prediction["thresholds"])
-    return FadingConfig(**data.get("fading", {})), PredictionConfig(**prediction)
+    return FadingConfig(**data.get("fading", {})), SearchConfig(**data.get("search", {}))

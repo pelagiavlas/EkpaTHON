@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { CircleCheck, Hand, Info, TrendingDown } from "lucide-react";
+import { CircleCheck, Flag, Hand, Info, TrendingDown } from "lucide-react";
 import { Screen } from "../components/Screen";
 import { CourseIcon, LevelSteps, Loading, Notice } from "../components/common";
 import { useSettings } from "../settings";
@@ -127,20 +127,33 @@ function CourseCard({ course }: { course: CourseProgress }) {
         <CourseIcon name={course.icon} />
         {course.name}
       </h2>
-      <LevelSteps level={course.level} compact />
       <Notice tone={course.message.includes("λιγότερη") ? "success" : "info"} icon={course.message.includes("λιγότερη") ? TrendingDown : Info}>
         <p>{course.message}</p>
       </Notice>
       <WeekHands course={course} />
       <DailyChart course={course} />
+      <h3>Επίπεδο βοήθειας σε κάθε ενότητα</h3>
+      {course.chapters.map((ch) => (
+        <div key={ch.title} className="chapter-levels">
+          <p className="chapter-title">{ch.title}</p>
+          <ul className="section-levels">
+            {ch.sections.map((s) => (
+              <li key={s.id}>
+                <span className="section-name">{s.label}</span>
+                <LevelSteps level={s.level} compact />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
       {course.level_history.length > 0 && (
         <>
           <h3>Αλλαγές επιπέδου</h3>
           <ul className="history">
             {course.level_history.map((h) => (
-              <li key={h.at}>
+              <li key={`${h.at}-${h.section}`}>
                 <CircleCheck aria-hidden="true" />
-                {dayFmt.format(new Date(h.at))}: από επίπεδο {h.from_level} σε επίπεδο {h.to_level}
+                {dayFmt.format(new Date(h.at))}, {h.section}: από επίπεδο {h.from_level} σε επίπεδο {h.to_level}
               </li>
             ))}
           </ul>
@@ -170,6 +183,22 @@ function ProgressBody({ data, impersonal = false }: { data: Progress; impersonal
           ? "Ένα χεράκι = μία υπόδειξη ανά ερώτηση. Λιγότερα χεράκια σημαίνουν λιγότερη βοήθεια."
           : "Ένα χεράκι = μία υπόδειξη ανά ερώτηση. Λιγότερα χεράκια σημαίνουν ότι τα καταφέρνεις με λιγότερη βοήθεια."}
       </p>
+      {data.milestones.length > 0 && (
+        <section className="panel" aria-labelledby="milestones-title">
+          <h2 id="milestones-title" className="with-icon">
+            <Flag aria-hidden="true" />
+            Τα ορόσημά σου
+          </h2>
+          <ul className="history">
+            {data.milestones.map((m) => (
+              <li key={m.key}>
+                <Flag aria-hidden="true" />
+                {dayFmt.format(new Date(m.created_at))}: {m.text}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {data.courses.map((c) => (
         <CourseCard key={c.id} course={c} />
       ))}
@@ -185,7 +214,7 @@ export function ProgressScreen() {
       title="Η πρόοδός μου"
       back="/"
       autoRead={settings.autoRead && !!data}
-      listen={data ? [{ text: data.message }, ...data.courses.map((c) => ({ text: `${c.name}. Επίπεδο ${c.level} από 4. ${c.message}` }))] : undefined}
+      listen={data ? [{ text: data.message }, ...data.courses.map((c) => ({ text: `${c.name}. ${c.message}` }))] : undefined}
     >
       {error && <Notice tone="error" live>{error}</Notice>}
       {!data && !error && <Loading />}

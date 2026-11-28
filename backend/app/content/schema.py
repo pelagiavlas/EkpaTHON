@@ -25,7 +25,7 @@ class Block(BaseModel):
     alt: str | None = None
     formula: str | None = None  # kept exactly as in the original
     symbols: list[Symbol] = []
-    essential: bool = True  # non-essential pictures are hidden from level 3 up
+    essential: bool = True  # picture for a hard idea: level 1 shows every picture, level 2 only these
 
     @model_validator(mode="after")
     def check(self):
@@ -69,8 +69,11 @@ class QuestionContent(BaseModel):
     options: list[Option] = Field(min_length=2, max_length=3)  # options[0] is the right one
     accept: list[list[str]] = []  # open answers: any group whose stems all appear
     key_point: str  # shown only AFTER the student has tried
-    hints: list[Hint] = []
+    hints: list[Hint] = []  # the 4 hints that explain (levels 1-2, and fallback at 3-4)
     levels: list[int] = [1, 2, 3, 4]
+    # Levels 3-4 send the student into the original text. Optional, to set by hand:
+    source_sentence: str | None = None  # the sentence of the original that answers the question
+    source_hint: str | None = None  # "τι γίνεται όταν μεγαλώνει το n" in "Βρες την πρόταση που λέει ..."
     meta: dict = {}
 
     @field_validator("hints")

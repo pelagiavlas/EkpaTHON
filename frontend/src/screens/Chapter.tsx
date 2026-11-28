@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BookOpen, ChevronRight } from "lucide-react";
 import { Screen } from "../components/Screen";
-import { Loading, Notice } from "../components/common";
+import { LevelSteps, Loading, Notice } from "../components/common";
 import type { Chapter } from "../types";
 import { useLoad } from "../useLoad";
 
@@ -24,7 +24,7 @@ export function ChapterScreen() {
       {!chapter && !error && <Loading />}
       {chapter && (
         <>
-          <p>Το κεφάλαιο έχει {chapter.sections.length} μικρές ενότητες. Διάβασέ τες με τη σειρά.</p>
+          <p>Το κεφάλαιο έχει {chapter.sections.length} μικρές ενότητες. Κάθε ενότητα έχει το δικό της επίπεδο βοήθειας.</p>
           <ol className="cards">
             {chapter.sections.map((s, i) => (
               <li key={s.id}>
@@ -32,6 +32,8 @@ export function ChapterScreen() {
                   <span className="card-number" aria-hidden="true">{i + 1}</span>
                   <span className="card-body">
                     <span className="card-title">{sectionLabel(s)}</span>
+                    <LevelSteps level={s.level} compact />
+                    {s.has_proposal && <span className="badge">Έχεις πρόταση</span>}
                   </span>
                   <ChevronRight aria-hidden="true" />
                 </Link>

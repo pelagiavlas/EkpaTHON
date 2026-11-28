@@ -13,7 +13,8 @@ ICONS = ("chart", "book", "flask", "calculator", "brain", "globe", "scale", "cod
 # --- settings -------------------------------------------------------------
 
 class Settings(BaseModel):
-    """Display and sound settings. Only what the student chose: no diagnosis."""
+    """Accessibility settings. Only what the student chose: no diagnosis.
+    A support level NEVER changes these."""
 
     fontScale: float = Field(1.0, ge=1.0, le=2.0)
     lineSpacing: float = Field(1.6, ge=1.4, le=2.4)
@@ -22,7 +23,35 @@ class Settings(BaseModel):
     readAloud: bool = True
     autoRead: bool = True
     voiceRate: float = Field(0.9, ge=0.5, le=1.5)
-    onboarded: bool = False
+    onboarded: bool = False  # the one-time "you can change this in Settings" tip was closed
+
+
+# --- milestones and support levels ---------------------------------------
+
+class MilestoneOut(BaseModel):
+    key: str
+    text: str
+    created_at: datetime
+
+
+class ProposalOut(BaseModel):
+    reason: str
+    from_level: int
+    to_level: int
+    message: str
+
+
+class SupportOut(BaseModel):
+    section_id: int
+    level: int
+    level_name: str
+    proposal: ProposalOut | None
+    new_milestones: list[MilestoneOut] = []
+
+
+class LevelIn(BaseModel):
+    level: int = Field(ge=1, le=4)
+    reason: Literal["proposal", "manual"] = "manual"
 
 
 # --- courses and chapters -------------------------------------------------
@@ -32,27 +61,21 @@ class CourseIn(BaseModel):
     icon: Literal[ICONS] = "book"  # type: ignore[valid-type]
 
 
-class ProposalOut(BaseModel):
-    direction: Literal["up", "down"]
-    from_level: int
-    to_level: int
-    message: str
-
-
 class CourseOut(BaseModel):
     id: int
     name: str
     icon: str
-    level: int
-    level_name: str
     chapters: int
-    proposal: ProposalOut | None
+    proposals: int  # sections with a proposal waiting for an answer
 
 
 class SectionSummary(BaseModel):
     id: int
     number: str | None
     title: str
+    level: int
+    level_name: str
+    has_proposal: bool
 
 
 class DocumentOut(BaseModel):
@@ -61,26 +84,7 @@ class DocumentOut(BaseModel):
     title: str
     filename: str
     uploaded_at: datetime
-    start_level: int | None
-    suggested_level: int | None
     sections: list[SectionSummary]
-
-
-class SuggestionOut(BaseModel):
-    level: int
-    level_name: str
-    reason: str
-
-
-class UploadOut(BaseModel):
-    document: DocumentOut
-    suggestion: SuggestionOut
-    current_level: int
-
-
-class LevelIn(BaseModel):
-    level: int = Field(ge=1, le=4)
-    reason: Literal["proposal", "manual", "new_chapter"] = "manual"
 
 
 # --- study ----------------------------------------------------------------
@@ -99,17 +103,18 @@ class StudyOut(BaseModel):
     document_title: str
     course_id: int
     course_name: str
-    level: int
+    support: SupportOut
     position: int  # 1-based
     total: int
     prev_id: int | None
     next_id: int | None
     original: list[str]
     easy: EasyOut
+    demo: bool  # simulated data present: the level preview for the presentation is offered
 
 
-class ViewIn(BaseModel):
-    mode: Literal["easy", "original"]
+class VisitOut(BaseModel):
+    visit_id: int
 
 
 # --- questions ------------------------------------------------------------
@@ -138,6 +143,7 @@ class QuestionsOut(BaseModel):
     section_id: int
     course_id: int
     level: int
+    exam: bool
     questions: list[QuestionOut]
     ask_strategy: bool  # level 3: ask "Τι σε βοήθησε;" at the end
     last_strategy: LastStrategy | None
@@ -145,21 +151,36 @@ class QuestionsOut(BaseModel):
 
 class AttemptOut(BaseModel):
     attempt_id: int
-    hints_used: int
+    new_milestones: list[MilestoneOut] = []
 
 
 class HintOut(BaseModel):
-    step: int
+    kind: Literal["explain", "search"]
+    step: int  # explain: 1-4, search: 1-3
     text: str
-    action: str | None
+    action: Literal["open_section", "replay_example", "open_original", "highlight_paragraph", "pick_sentence"] | None
     section_id: int | None
-    choices: list[OptionOut]  # only for step 3: two choices
-    example: Block | None = None  # for "replay_example": the everyday example to hear again
+    paragraph: int | None = None  # index in the original paragraphs (search steps 2-3)
+    sentences: list[str] = []  # search step 3: the sentences of that paragraph, each one a button
+    choices: list[OptionOut] = []  # explain step 3: two choices
+    example: Block | None = None  # "replay_example": the everyday example to hear again
+    fell_back: bool = False  # the first explaining hint after searching
+
+
+class PickIn(BaseModel):
+    sentence: int = Field(ge=0)
+
+
+class PickOut(BaseModel):
+    correct: bool
+    message: str
+    fallback_hint: HintOut | None = None
+    new_milestones: list[MilestoneOut] = []
 
 
 class AnswerIn(BaseModel):
     option_id: int | None = None
-    text: str | None = Field(None, max_length=1000)
+    text: str | None = Field(None, max_length=2000)
 
 
 class SelfCheckIn(BaseModel):
@@ -177,10 +198,29 @@ class AnswerOut(BaseModel):
     key_point: str | None  # only after the student has tried
     done: bool
     proposal: ProposalOut | None = None
+    new_milestones: list[MilestoneOut] = []
 
 
 class StrategyIn(BaseModel):
     choice: Literal["listen", "image", "example"]
+
+
+class NoteIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class NoteOut(BaseModel):
+    id: int
+    kind: str
+    text: str
+    created_at: datetime
+
+
+class KeyPointsOut(BaseModel):
+    """Level 4: shown only after the student has written their own key points."""
+
+    attempt_id: int
+    key_points: list[str]
 
 
 # --- progress -------------------------------------------------------------
@@ -199,8 +239,21 @@ class WeekPoint(BaseModel):
     hints_per_question: float | None
 
 
+class SectionLevel(BaseModel):
+    id: int
+    label: str
+    level: int
+    level_name: str
+
+
+class ChapterLevels(BaseModel):
+    title: str
+    sections: list[SectionLevel]
+
+
 class LevelStep(BaseModel):
     at: datetime
+    section: str
     from_level: int
     to_level: int
 
@@ -209,8 +262,7 @@ class CourseProgress(BaseModel):
     id: int
     name: str
     icon: str
-    level: int
-    level_name: str
+    chapters: list[ChapterLevels]
     days: list[DayPoint]
     weeks: list[WeekPoint]
     level_history: list[LevelStep]
@@ -221,6 +273,7 @@ class ProgressOut(BaseModel):
     simulated: bool
     message: str
     courses: list[CourseProgress]
+    milestones: list[MilestoneOut]
 
 
 # --- supporter ------------------------------------------------------------

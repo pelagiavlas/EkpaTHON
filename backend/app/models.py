@@ -1,8 +1,8 @@
 """Database tables. Everything stays on the student's device and belongs to them.
 
 No diagnosis or label about the person is stored anywhere: only the settings
-they chose and a support level per course that moves both ways.
-Rows marked `simulated` come from the demo script and are shown as such.
+they chose and a support level per SECTION that moves both ways, always with
+the student's approval. Rows marked `simulated` come from the demo script.
 """
 
 from datetime import datetime
@@ -12,17 +12,13 @@ from sqlmodel import Field, SQLModel
 
 class Profile(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    settings_json: str = "{}"
+    settings_json: str = "{}"  # accessibility settings: never changed by a support level
 
 
 class Course(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
     icon: str = "book"
-    level: int = 1  # support level 1 (full help) ... 4 (autonomy)
-    proposal: str | None = None  # "up" | "down" while waiting for the student's answer
-    # Only answers after the last level decision count for new proposals.
-    window_start: datetime = Field(default_factory=datetime.now)
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -35,8 +31,6 @@ class Document(SQLModel, table=True):
     title: str = ""
     sha256: str = Field(default="", index=True)
     path: str = ""  # local file under storage/ ("" for simulated chapters)
-    suggested_level: int | None = None
-    start_level: int | None = None
     simulated: bool = False
     uploaded_at: datetime = Field(default_factory=datetime.now)
 
@@ -48,6 +42,17 @@ class Section(SQLModel, table=True):
     number: str | None = None  # "3.2" when the heading is numbered
     title: str
     paragraphs_json: str  # original text, one entry per paragraph
+
+
+class SectionSupport(SQLModel, table=True):
+    """Support level of one section. Every section starts at level 1."""
+
+    section_id: int = Field(foreign_key="section.id", primary_key=True)
+    level: int = 1
+    proposal_to: int | None = None  # a level waiting for the student's yes/no
+    proposal_reason: str | None = None  # fading_up | fading_down | easy_use | same_topic
+    # Only answers and visits after the last decision count for new proposals.
+    window_start: datetime = Field(default_factory=datetime.now)
 
 
 class ContentCache(SQLModel, table=True):
@@ -66,18 +71,24 @@ class Question(SQLModel, table=True):
 
 
 class Attempt(SQLModel, table=True):
-    """One student working on one question."""
+    """One student working on one question (or on the key points, at level 4)."""
 
     id: int | None = Field(default=None, primary_key=True)
     question_id: int | None = Field(default=None, foreign_key="question.id")
+    section_id: int | None = Field(default=None, foreign_key="section.id", index=True)
     course_id: int = Field(foreign_key="course.id", index=True)
     document_id: int | None = Field(default=None, foreign_key="document.id")
     level: int
-    hints_used: int = 0  # 0-4
+    mode: str = "question"  # question | keypoints | exam (exam never changes the level)
+    hints_used: int = 0  # hints that explain (0-4)
+    search_steps: int = 0  # levels 3-4: hints that point into the original (0-3)
+    wrong_picks: int = 0
+    found_sentence: bool = False
+    fell_back: bool = False  # levels 3-4: went back to the hints that explain
     wrong_tries: int = 0
     correct: bool | None = None  # None while still open
     self_checked: bool = False
-    awaiting_self_check: bool = False  # open answer sent, student compares with the key point
+    awaiting_self_check: bool = False
     opened_section: bool = False
     listened: bool = False
     started_at: datetime = Field(default_factory=datetime.now)
@@ -85,20 +96,23 @@ class Attempt(SQLModel, table=True):
     simulated: bool = False
 
 
-class StudyView(SQLModel, table=True):
+class Visit(SQLModel, table=True):
+    """One time the student opened a section to read it."""
+
     id: int | None = Field(default=None, primary_key=True)
-    section_id: int = Field(foreign_key="section.id")
-    mode: str  # "easy" | "original"
+    section_id: int = Field(foreign_key="section.id", index=True)
+    level: int
+    used_easy: bool = False  # opened the Easy-to-Read text during this visit
     created_at: datetime = Field(default_factory=datetime.now)
 
 
 class LevelChange(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    course_id: int = Field(foreign_key="course.id", index=True)
+    section_id: int = Field(foreign_key="section.id", index=True)
     from_level: int
     to_level: int
-    reason: str  # "proposal" | "manual" | "new_chapter"
-    accepted: bool = True  # False = the student said "not now" to a proposal
+    reason: str  # fading_up | fading_down | easy_use | same_topic | manual
+    accepted: bool = True  # False = the student said "not now"
     created_at: datetime = Field(default_factory=datetime.now)
     simulated: bool = False
 
@@ -110,6 +124,26 @@ class StrategyNote(SQLModel, table=True):
     course_id: int = Field(foreign_key="course.id", index=True)
     choice: str  # "listen" | "image" | "example"
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+class SectionNote(SQLModel, table=True):
+    """Level 4: key points the student wrote, or a question of their own."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    section_id: int = Field(foreign_key="section.id", index=True)
+    kind: str  # "keypoints" | "question"
+    text: str
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class Milestone(SQLModel, table=True):
+    """A calm "first time" message, shown once."""
+
+    key: str = Field(primary_key=True)
+    section_id: int | None = None
+    seen: bool = False
+    created_at: datetime = Field(default_factory=datetime.now)
+    simulated: bool = False
 
 
 class SupporterAccess(SQLModel, table=True):
