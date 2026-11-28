@@ -23,9 +23,13 @@ from datetime import datetime, time, timedelta
 from sqlmodel import Session, SQLModel, select
 
 from app.db import engine, init_db
+from app.ekpa import service as ekpa
+from app.ekpa.clock import demo_day
+from app.ekpa.mock import MockEkpaProvider
+from app.ekpa.schedule import Slot, parse_time
 from app.learning import service
 from app.models import (
-    Attempt, ConceptMastery, Course, Document, LevelChange, Milestone, Profile, Section, SectionSupport, StrategyNote,
+    Attempt, ClassConfirmation, ConceptMastery, Course, SyllabusUnit, Document, LevelChange, Milestone, Profile, Section, SectionSupport, StrategyNote,
 )
 from app.schemas import Settings
 from scripts.make_demo_pdf import main as make_demo_pdf
@@ -116,15 +120,40 @@ def trace_knowledge(session: Session) -> None:
         session.add(row)
 
 
+def demo_provider() -> MockEkpaProvider:
+    """The mock eClass, dated on the demo "today" (the nearest day with a class at 11:00)."""
+    mock = MockEkpaProvider(datetime.now().date())
+    slots = [Slot(0, s.weekday, parse_time(s.start), parse_time(s.end), s.room) for s in mock.timetable()]
+    return MockEkpaProvider(demo_day(slots, datetime.now().date()))
+
+
+def confirm_past_classes(session: Session, provider: MockEkpaProvider, taught_until: dict[int, str]) -> None:
+    """Past classes already answered: teaching reached `taught_until` (so today's class is about the next unit)."""
+    today = provider.today
+    slots = ekpa.load_slots(session)
+    for course_id, last_number in taught_until.items():
+        units = session.exec(select(SyllabusUnit).where(SyllabusUnit.course_id == course_id).order_by(SyllabusUnit.position)).all()
+        last = next(u.position for u in units if u.number == last_number)
+        days = [today - timedelta(days=n) for n in range(1, 15)]
+        class_days = [d for d in days if any(s.course_id == course_id and s.weekday == d.weekday() for s in slots)]
+        for i, day in enumerate(class_days):  # most recent class -> last taught unit, going back
+            position = max(0, last - i)
+            unit = next(u for u in units if u.position == position)
+            session.add(ClassConfirmation(course_id=course_id, class_date=day, unit_id=unit.id, status="done",
+                                          asked_on=day, simulated=True))
+    session.flush()
+
+
 def seed(session: Session) -> None:
     profile = session.get(Profile, 1) or Profile(id=1)
     profile.settings_json = Settings(onboarded=True).model_dump_json()
     session.add(profile)
 
-    stats = Course(name="Στατιστική", icon="chart", created_at=at(14, 10))
-    psych = Course(name="Κοινωνική Ψυχολογία", icon="brain", created_at=at(4, 10))
-    session.add_all([stats, psych])
-    session.flush()
+    # Courses, timetable and syllabus come from (simulated) eClass.
+    provider = demo_provider()
+    courses = ekpa.sync_structure(session, provider)
+    stats, psych = courses["stat101"], courses["psy210"]
+    stats.created_at, psych.created_at = at(14, 10), at(4, 10)
 
     stats_sections = add_chapters(session, stats, STATISTICS, [14, 7])
     psych_sections = add_chapters(session, psych, PSYCHOLOGY, [4])
@@ -143,6 +172,9 @@ def seed(session: Session) -> None:
                           created_at=at(4, 21), simulated=True))
     session.add(StrategyNote(course_id=stats.id, choice="example", created_at=at(1, 18)))
     trace_knowledge(session)
+    confirm_past_classes(session, provider, {stats.id: "3.3", psych.id: "2.1"})
+    # Last: the teacher's new PDFs, analysed like uploads (BKT already knows the earlier concepts).
+    ekpa.sync_documents(session, provider)
     session.commit()
 
 
@@ -159,10 +191,10 @@ def main() -> int:
         if session.exec(select(Course)).first() is not None:
             print("Η βάση έχει ήδη δεδομένα. Τρέξε ξανά με --reset για να τα σβήσεις και να φτιάξεις το demo.")
             return 1
+        pdf = make_demo_pdf()  # the PDFs the simulated eClass points to
         seed(session)
-    pdf = make_demo_pdf()
     print("Έτοιμο το demo (ΠΡΟΣΟΜΟΙΩΜΕΝΑ δεδομένα 2 εβδομάδων).")
-    print(f"PDF για το ζωντανό ανέβασμα: {pdf}")
+    print(f"Το Κεφάλαιο 3 έρχεται ως «Νέο υλικό» από το (προσομοιωμένο) eClass. Για χειροκίνητο ανέβασμα: {pdf}")
     print("Για την προεπισκόπηση στην παρουσίαση: DEMO_MODE=true στο backend/.env ή ?demo=1 στο URL.")
     return 0
 

@@ -32,6 +32,11 @@ async function check(page, name, theme, device) {
   const text = await page.evaluate(() => document.body.innerText);
   const bad = text.match(/[Εε]πίπεδο\s*\d|χεράκ|Μαθαίνουμε/);
   if (bad) problems.push(`[${device}/${theme}] ${name}: «${bad[0]}» στο κείμενο`);
+  // Reflow (WCAG 1.4.10): no sideways scrolling, nothing cut off in the bottom menu.
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth > window.innerWidth + 1 ||
+    [...document.querySelectorAll(".bottomnav a")].some((a) => a.scrollWidth > a.clientWidth + 1));
+  if (overflow) problems.push(`[${device}/${theme}] ${name}: κείμενο που δεν χωράει (οριζόντιο scroll ή κομμένο μενού)`);
   // Knowledge is shown in words only: no numbers or percentages next to concepts.
   const concepts = await page.locator(".concepts").allInnerTexts();
   if (concepts.some((c) => /\d/.test(c))) problems.push(`[${device}/${theme}] ${name}: αριθμός σε λίστα εννοιών`);
@@ -63,7 +68,20 @@ async function run(theme, device) {
     await check(page, name, theme, device);
   };
 
-  await go("/", "courses");
+  // "Σήμερα" with the demo clock: before the 11:00 class, then after it.
+  await go("/?demo=1", "today-before");
+  await page.getByRole("button", { name: "Μετά το μάθημα (13:00)" }).click();
+  await page.waitForLoadState("networkidle");
+  await check(page, "today-after", theme, device);
+  const confirmYes = page.getByRole("button", { name: "Ναι", exact: true });
+  if (await confirmYes.isVisible().catch(() => false)) {
+    await confirmYes.click();
+    await page.getByText("Αποθηκεύτηκε").waitFor();
+    await check(page, "today-confirmed", theme, device);
+  }
+  await page.goto(`${BASE}/?demo=0`);
+  await page.waitForFunction(() => sessionStorage.getItem("studybuddy-demo") === null);
+  await go("/courses", "courses");
   await go("/courses/new", "new-course");
   await go("/courses/1", "course");
 
@@ -89,6 +107,7 @@ async function run(theme, device) {
   await preview.getByRole("button", { name: "Από το πρωτότυπο" }).click();
   await check(page, "study-preview-original", theme, device);
   await page.goto(`${BASE}/?demo=0`);
+  await page.waitForFunction(() => sessionStorage.getItem("studybuddy-demo") === null);
   await page.goto(`${BASE}/sections/${sec["3.4"]}/questions`);
   await page.getByRole("button", { name: "Βοήθεια" }).waitFor();
   await page.getByRole("button", { name: "Βοήθεια" }).click();

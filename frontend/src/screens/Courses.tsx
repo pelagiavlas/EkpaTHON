@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Check, ChevronRight, Plus, Save, Settings as SettingsIcon } from "lucide-react";
+import { Check, ChevronRight, Info, Plus, Save, Settings as SettingsIcon } from "lucide-react";
+import { useClock } from "../demo";
 import { api, errorText } from "../api";
 import { Screen } from "../components/Screen";
 import { COURSE_ICONS, CourseIcon, Loading, Notice } from "../components/common";
@@ -26,15 +27,19 @@ function FirstTip() {
 }
 
 export function Courses() {
-  const { data: courses, error } = useLoad<Course[]>("/courses");
+  const clock = useClock();
+  const { data: courses, error } = useLoad<Course[]>(`/courses?${clock.query}`);
   const { settings } = useSettings();
   const navigate = useNavigate();
 
   const listen = [{ text: "Τα μαθήματά μου." }, ...(courses ?? []).map((c) => ({ text: `${c.name}.` }))];
 
   return (
-    <Screen title="Τα μαθήματά μου" listen={listen} autoRead={settings.autoRead && !!courses}>
+    <Screen title="Τα μαθήματά μου" back="/" listen={listen} autoRead={settings.autoRead && !!courses}>
       <FirstTip />
+      {courses?.some((c) => c.from_eclass) && (
+        <Notice icon={Info}><p><strong>Προσομοιωμένα δεδομένα eClass.</strong> Τα μαθήματα έρχονται από το eClass του ΕΚΠΑ.</p></Notice>
+      )}
       {error && <Notice tone="error" live>{error}</Notice>}
       {!courses && !error && <Loading />}
       {courses?.length === 0 && <p className="lead">Δεν έχεις ακόμα μαθήματα. Πρόσθεσε το πρώτο σου μάθημα.</p>}
@@ -46,7 +51,11 @@ export function Courses() {
                 <CourseIcon name={c.icon} />
                 <span className="card-body">
                   <span className="card-title">{c.name}</span>
-                  <span>{c.chapters === 1 ? "1 κεφάλαιο" : `${c.chapters} κεφάλαια`}</span>
+                  {c.teaching && <span><strong>Στο μάθημα:</strong> {c.teaching}</span>}
+                  {c.with_material > 0
+                    ? <span><strong>Έχεις μελετήσει:</strong> {c.studied} από {c.with_material} ενότητες</span>
+                    : <span>{c.chapters === 1 ? "1 κεφάλαιο" : `${c.chapters} κεφάλαια`}</span>}
+                  {c.next_text && <span className="next-step">{c.next_text}</span>}
                   {c.proposals > 0 && <span className="badge">Έχεις πρόταση</span>}
                 </span>
                 <ChevronRight aria-hidden="true" />
@@ -89,7 +98,7 @@ export function NewCourse() {
   };
 
   return (
-    <Screen title="Νέο μάθημα" back="/">
+    <Screen title="Νέο μάθημα" back="/courses">
       <form onSubmit={submit} noValidate>
         <div className="field">
           <label htmlFor="course-name">Πώς λέγεται το μάθημα;</label>

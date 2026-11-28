@@ -10,7 +10,7 @@ export function NotFound() {
       <div className="actions">
         <button type="button" className="btn btn-primary" onClick={() => navigate("/")}>
           <BookOpen aria-hidden="true" />
-          Πήγαινε στα μαθήματά μου
+          Πήγαινε στη σελίδα «Σήμερα»
         </button>
       </div>
     </Screen>

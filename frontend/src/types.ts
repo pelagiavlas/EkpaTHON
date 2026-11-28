@@ -38,6 +38,12 @@ export interface Course {
   icon: string;
   chapters: number;
   proposals: number;
+  from_eclass: boolean;
+  teaching: string | null;
+  studied: number;
+  with_material: number;
+  next_section_id: number | null;
+  next_text: string | null;
 }
 
 export interface SectionSummary {
@@ -195,4 +201,51 @@ export interface Supporter {
   token: string;
   created_at: string;
   active: boolean;
+}
+
+// --- eClass and "Σήμερα" ---
+
+export interface NextClass {
+  course_id: number;
+  course_name: string;
+  day: string;
+  weekday: string;
+  is_today: boolean;
+  start: string;
+  end: string;
+  room: string;
+  phase: "before" | "during" | "later";
+}
+
+export interface UnitChoice {
+  unit_id: number;
+  title: string;
+}
+
+export interface Today {
+  now: string;
+  demo: boolean;
+  simulated_eclass: boolean;
+  next_class: NextClass | null;
+  before: { course_id: number; course_name: string; unit_id: number; unit_title: string; section_id: number | null; minutes: number | null } | null;
+  after: { course_id: number; course_name: string; class_date: string; when: string; predicted: UnitChoice | null; units: UnitChoice[] } | null;
+  new_material: { document_id: number; course_name: string; title: string; added_on: string }[];
+}
+
+export interface ConfirmResult {
+  status: "done" | "unknown";
+  unit_title: string | null;
+  section_id: number | null;
+  has_questions: boolean;
+}
+
+export interface Plan {
+  teaching: { unit_id: number; title: string; week: number } | null;
+  teaching_from: "confirmed" | "plan";
+  week: number;
+  units: { unit_id: number; title: string; week: number; taught: boolean; section_id: number | null; studied: boolean }[];
+  studied: number;
+  with_material: number;
+  next: { section_id: number; text: string } | null;
+  simulated_eclass: boolean;
 }

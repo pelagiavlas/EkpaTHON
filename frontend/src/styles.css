@@ -1247,3 +1247,93 @@ h3 > svg {
     grid-column: 2;
   }
 }
+
+/* ---- Σήμερα ---- */
+
+.today-card {
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+  margin: 1rem 0;
+  background: var(--surface);
+}
+.today-card h2 {
+  margin-top: 0;
+}
+.card-big {
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+.card-button {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.next-step {
+  font-weight: 700;
+  color: var(--primary);
+}
+.plan-units {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.plan-units li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.6rem;
+  align-items: center;
+}
+.plan-units svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  grid-row: span 2;
+  color: var(--muted);
+}
+.plan-units svg.ok {
+  color: var(--success);
+}
+.plan-title {
+  font-weight: 600;
+}
+.plan-status {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+/* Four items must fit on a phone, also with large letters (WCAG 1.4.10 reflow). */
+.bottomnav {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.bottomnav a {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.15rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+/* Reflow with large letters: grid columns never grow wider than the screen,
+   and very long words may break instead of pushing the page sideways. */
+.cards,
+.weeks,
+.section-levels,
+.concepts,
+.radio-cards,
+.choices,
+.answer-options {
+  grid-template-columns: minmax(0, 1fr);
+}
+.card-body,
+.card-title,
+.radio-card span,
+.concept-name,
+.section-name,
+h1,
+h2 {
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}

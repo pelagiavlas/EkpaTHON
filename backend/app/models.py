@@ -5,7 +5,7 @@ they chose and a support level per SECTION that moves both ways, always with
 the student's approval. Rows marked `simulated` come from the demo script.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -19,6 +19,7 @@ class Course(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
     icon: str = "book"
+    ekpa_id: str | None = Field(default=None, index=True)  # the university's id, when it comes from eClass
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -32,6 +33,9 @@ class Document(SQLModel, table=True):
     sha256: str = Field(default="", index=True)
     path: str = ""  # local file under storage/ ("" for simulated chapters)
     simulated: bool = False
+    source: str = "upload"  # "upload" (by the student) or "eclass" (posted by the teacher)
+    ekpa_id: str | None = Field(default=None, index=True)
+    seen_at: datetime | None = None  # first time the student opened it (for "Νέο υλικό")
     uploaded_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -170,3 +174,38 @@ class SupporterAccess(SQLModel, table=True):
     token: str = Field(index=True, unique=True)
     created_at: datetime = Field(default_factory=datetime.now)
     revoked_at: datetime | None = None
+
+
+class TimetableSlot(SQLModel, table=True):
+    """Weekly timetable from eClass."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    weekday: int  # 0 = Monday
+    start: str  # "HH:MM"
+    end: str
+    room: str = ""
+
+
+class SyllabusUnit(SQLModel, table=True):
+    """The teaching plan: units in order, each with its planned week."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    position: int
+    number: str | None = None
+    title: str
+    week: int
+
+
+class ClassConfirmation(SQLModel, table=True):
+    """What the student says was taught in a class. Can be corrected any time."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    class_date: date = Field(index=True)
+    unit_id: int | None = Field(default=None, foreign_key="syllabusunit.id")
+    status: str = "done"  # "done" | "unknown" ("Δεν ξέρω": asked again calmly another day)
+    asked_on: date | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    simulated: bool = False

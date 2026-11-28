@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   BookOpen, ChartColumn, ChevronRight, CircleCheck, CircleHelp, Footprints, HandHelping, Image as ImageIcon,
   Lightbulb, ListChecks, MapPin, PenLine, Save, Send, Users, Volume2, X,
@@ -20,10 +20,12 @@ type Phase = "intro" | "menu" | "keypoints" | "own" | "question" | "proposal" | 
 
 export function QuestionsScreen() {
   const { id } = useParams();
-  return <QuestionsFlow key={id} sectionId={id!} />;
+  const [search] = useSearchParams();
+  const limit = Number(search.get("limit")) || undefined; // "Θες 2 ερωτήσεις...;" from Σήμερα
+  return <QuestionsFlow key={id} sectionId={id!} limit={limit} />;
 }
 
-function QuestionsFlow({ sectionId }: { sectionId: string }) {
+function QuestionsFlow({ sectionId, limit }: { sectionId: string; limit?: number }) {
   const navigate = useNavigate();
   const { settings } = useSettings();
   const speech = useSpeech();
@@ -34,7 +36,7 @@ function QuestionsFlow({ sectionId }: { sectionId: string }) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [showSection, setShowSection] = useState(false);
 
-  const data = set.data;
+  const data = set.data && limit ? { ...set.data, questions: set.data.questions.slice(0, limit) } : set.data;
   useEffect(() => {
     if (!data || phase !== null) return;
     if (data.level >= 4) setPhase("menu");

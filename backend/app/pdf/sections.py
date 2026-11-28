@@ -37,7 +37,11 @@ def is_verbatim(text: str) -> bool:
         return False
     if TABLE_GAP.search(stripped):
         return True
-    math = sum(ch in MATH_CHARS for ch in stripped)
+    # Greek letters used as symbols (μ, σ, Σ) count only when they stand alone ("σ / √n"),
+    # never inside a word: "Συμμόρφωση" is a heading, not a formula.
+    symbols = sum(ch in MATH_CHARS for ch in stripped if not ch.isalpha())
+    letters_as_symbols = sum(1 for w in re.findall(r"\w+", stripped) if len(w) == 1 and w in MATH_CHARS)
+    math = symbols + letters_as_symbols
     digits = sum(ch.isdigit() for ch in stripped)
     letters = sum(ch.isalpha() for ch in stripped)
     return "=" in stripped and (math + digits) >= letters / 2 or math >= 3 and letters < 15

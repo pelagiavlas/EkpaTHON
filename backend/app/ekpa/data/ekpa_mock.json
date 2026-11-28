@@ -1,0 +1,38 @@
+{
+  "_note": "Προσομοιωμένα δεδομένα eClass για την παρουσίαση. Οι ημερομηνίες είναι σχετικές με τη «σήμερα».",
+  "current_week": 9,
+  "courses": [
+    {"id": "stat101", "name": "Στατιστική", "icon": "chart"},
+    {"id": "psy210", "name": "Κοινωνική Ψυχολογία", "icon": "brain"}
+  ],
+  "timetable": [
+    {"course": "stat101", "weekday": 1, "start": "11:00", "end": "13:00", "room": "Αμφιθέατρο Α2"},
+    {"course": "stat101", "weekday": 3, "start": "11:00", "end": "13:00", "room": "Αμφιθέατρο Α2"},
+    {"course": "psy210", "weekday": 0, "start": "15:00", "end": "17:00", "room": "Αίθουσα 3"},
+    {"course": "psy210", "weekday": 2, "start": "15:00", "end": "17:00", "room": "Αίθουσα 3"}
+  ],
+  "documents": [
+    {"id": "stat101-ch3", "course": "stat101", "title": "Κεφάλαιο 3: Διάστημα εμπιστοσύνης",
+     "file": "kefalaio-3-diastima-empistosynis.pdf", "added_days_ago": 5},
+    {"id": "psy210-ch2", "course": "psy210", "title": "Κεφάλαιο 2: Κοινωνική επιρροή",
+     "file": "psychologia-2-koinoniki-epirroi.pdf", "added_days_ago": 2}
+  ],
+  "syllabus": {
+    "stat101": [
+      {"number": "1.1", "title": "Μέση τιμή και διάμεσος", "week": 2},
+      {"number": "1.2", "title": "Διασπορά και τυπική απόκλιση", "week": 3},
+      {"number": "2.1", "title": "Σημειακή εκτίμηση και δειγματοληπτικό σφάλμα", "week": 4},
+      {"number": "2.2", "title": "Η έννοια του διαστήματος εμπιστοσύνης", "week": 5},
+      {"number": "3.1", "title": "Σημειακή εκτίμηση και δειγματοληπτικό σφάλμα", "week": 6},
+      {"number": "3.2", "title": "Η έννοια του διαστήματος εμπιστοσύνης", "week": 7},
+      {"number": "3.3", "title": "Διάστημα εμπιστοσύνης για τη μέση τιμή", "week": 8},
+      {"number": "3.4", "title": "Η επίδραση του μεγέθους του δείγματος", "week": 9}
+    ],
+    "psy210": [
+      {"number": "1.1", "title": "Τι είναι η κοινωνική ψυχολογία", "week": 6},
+      {"number": "1.2", "title": "Στάσεις και συμπεριφορά", "week": 7},
+      {"number": "2.1", "title": "Συμμόρφωση", "week": 8},
+      {"number": "2.2", "title": "Υπακοή στην εξουσία", "week": 9}
+    ]
+  }
+}

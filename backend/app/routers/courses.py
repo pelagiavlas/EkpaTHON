@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
@@ -28,7 +29,7 @@ def get_or_404(session: Session, model, id: int, message: str):
     return row
 
 
-def course_out(session: Session, course: Course) -> CourseOut:
+def course_out(session: Session, course: Course, today: date | None = None) -> CourseOut:
     docs = session.exec(
         select(Document.id).where(Document.course_id == course.id, Document.simulated == False)  # noqa: E712
     ).all()
@@ -37,7 +38,20 @@ def course_out(session: Session, course: Course) -> CourseOut:
         .join(Document, Document.id == Section.document_id)
         .where(Document.course_id == course.id, SectionSupport.proposal_to != None)  # noqa: E711
     ).all()
-    return CourseOut(id=course.id, name=course.name, icon=course.icon, chapters=len(docs), proposals=len(waiting))
+    out = CourseOut(id=course.id, name=course.name, icon=course.icon, chapters=len(docs), proposals=len(waiting),
+                    from_eclass=course.ekpa_id is not None)
+    if course.ekpa_id:
+        from app.ekpa import service as ekpa
+        from app.routers.today import semester_start
+
+        today = today or date.today()
+        plan = ekpa.course_plan(session, course, today, semester_start(today))
+        if plan["teaching"]:
+            out.teaching = f"{plan['teaching']['title']} (εβδομάδα {plan['teaching']['week']})"
+        out.studied, out.with_material = plan["studied"], plan["with_material"]
+        if plan["next"]:
+            out.next_section_id, out.next_text = plan["next"]["section_id"], plan["next"]["text"]
+    return out
 
 
 def document_out(session: Session, doc: Document) -> DocumentOut:
@@ -80,8 +94,11 @@ def concepts_of(number: str | None, title: str, paragraphs: list[str]) -> list[s
 
 
 @router.get("/courses", response_model=list[CourseOut])
-def list_courses(session: Session = Depends(get_session)):
-    return [course_out(session, c) for c in session.exec(select(Course).order_by(Course.created_at))]
+def list_courses(demo: bool = False, moment: str | None = None, session: Session = Depends(get_session)):
+    from app.routers.today import app_now
+
+    today = app_now(session, demo, moment)[0].date()
+    return [course_out(session, c, today) for c in session.exec(select(Course).order_by(Course.created_at))]
 
 
 @router.post("/courses", response_model=CourseOut, status_code=201)
@@ -135,45 +152,67 @@ def chapter_title(sections, filename: str) -> str:
     return Path(filename).stem.replace("_", " ").replace("-", " ")
 
 
+def import_pdf(session: Session, course: Course, data: bytes, filename: str, *, title: str | None = None,
+               source: str = "upload", ekpa_id: str | None = None, added_at: datetime | None = None) -> Document:
+    """PDF -> sections -> concepts. Used for uploads and for documents that come from eClass.
+    Every new section starts at level 1, no placement question. A section whose concepts the
+    student already knows gets a PROPOSAL, never a silent change. Raises PdfError."""
+    sections = pdf_to_sections(data)
+    if not sections:
+        raise PdfError("Δεν βρέθηκε κείμενο σε αυτό το PDF. Δοκίμασε άλλο.")
+    sha = hashlib.sha256(data).hexdigest()
+    doc = session.exec(select(Document).where(Document.course_id == course.id, Document.sha256 == sha)).first()
+    if doc is not None:
+        return doc
+    path = STORAGE_DIR / f"{sha}.pdf"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    filename = Path(filename or "kefalaio.pdf").name
+    doc = Document(
+        course_id=course.id, filename=filename, title=title or chapter_title(sections, filename), sha256=sha,
+        path=str(path), source=source, ekpa_id=ekpa_id, uploaded_at=added_at or datetime.now(),
+        seen_at=datetime.now() if source == "upload" else None,
+    )
+    session.add(doc)
+    session.flush()
+    for position, s in enumerate(sections):
+        row = Section(
+            document_id=doc.id, position=position, number=s.number, title=s.title,
+            paragraphs_json=json.dumps(s.paragraphs, ensure_ascii=False),
+            concepts_json=json.dumps(concepts_of(s.number, s.title, s.paragraphs), ensure_ascii=False),
+        )
+        session.add(row)
+        session.flush()
+        session.add(SectionSupport(section_id=row.id))
+        session.flush()
+        service.propose_known_concepts(session, row, course.id)
+    return doc
+
+
 @router.post("/courses/{course_id}/documents", response_model=DocumentOut, status_code=201)
 async def upload_document(course_id: int, file: UploadFile, session: Session = Depends(get_session)):
-    """Straight to the sections: every new section starts at level 1, no placement question.
-    A section whose concepts the student already knows gets a PROPOSAL, never a silent change."""
+    """Manual upload: still there next to the documents that come from eClass."""
     course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
     data = await file.read(MAX_PDF_BYTES + 1)
     if len(data) > MAX_PDF_BYTES:
         raise HTTPException(413, "Το αρχείο είναι πολύ μεγάλο. Δοκίμασε ένα PDF μικρότερο από 20 MB.")
     try:
-        sections = pdf_to_sections(data)
+        doc = import_pdf(session, course, data, file.filename or "kefalaio.pdf")
     except PdfError as err:
         raise HTTPException(422, str(err))
-    if not sections:
-        raise HTTPException(422, "Δεν βρέθηκε κείμενο σε αυτό το PDF. Δοκίμασε άλλο.")
-
-    sha = hashlib.sha256(data).hexdigest()
-    doc = session.exec(select(Document).where(Document.course_id == course_id, Document.sha256 == sha)).first()
-    if doc is None:
-        path = STORAGE_DIR / f"{sha}.pdf"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-        filename = Path(file.filename or "kefalaio.pdf").name
-        doc = Document(course_id=course_id, filename=filename, title=chapter_title(sections, filename), sha256=sha, path=str(path))
-        session.add(doc)
-        session.flush()
-        for position, s in enumerate(sections):
-            row = Section(
-                document_id=doc.id, position=position, number=s.number, title=s.title,
-                paragraphs_json=json.dumps(s.paragraphs, ensure_ascii=False),
-                concepts_json=json.dumps(concepts_of(s.number, s.title, s.paragraphs), ensure_ascii=False),
-            )
-            session.add(row)
-            session.flush()
-            session.add(SectionSupport(section_id=row.id))
-            session.flush()
-            service.propose_known_concepts(session, row, course.id)
     session.commit()
     session.refresh(doc)
     return document_out(session, doc)
+
+
+@router.post("/documents/{document_id}/seen", status_code=204)
+def document_seen(document_id: int, session: Session = Depends(get_session)):
+    """The student opened it: it is no longer "Νέο υλικό"."""
+    doc = get_or_404(session, Document, document_id, "Δεν βρέθηκε το κεφάλαιο")
+    if doc.seen_at is None:
+        doc.seen_at = datetime.now()
+        session.add(doc)
+        session.commit()
 
 
 @router.get("/documents/{document_id}", response_model=DocumentOut)

@@ -85,6 +85,8 @@ def test_not_a_pdf(data):
         ("Βαθμός    Συχνότητα    Ποσοστό", True),
         ("Η μέση τιμή είναι ένα μέτρο θέσης.", False),
         ("Το 30% των φοιτητών απάντησε ναι.", False),
+        ("2.1 Συμμόρφωση", False),  # Greek letters inside words are not math symbols
+        ("x̄ ± z · σ / √n", True),  # standalone σ still counts
     ],
 )
 def test_is_verbatim(text, expected):

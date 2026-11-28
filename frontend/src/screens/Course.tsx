@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronRight, FileText, Trash2, Upload, X } from "lucide-react";
+import { BookOpen, Check, ChevronRight, Circle, CircleCheck, FileText, Pencil, Trash2, Upload, X } from "lucide-react";
+import { useClock } from "../demo";
 import { api, errorText } from "../api";
 import { Screen } from "../components/Screen";
 import { LEVELS, LevelSteps, Loading, Notice } from "../components/common";
-import type { Chapter, Course } from "../types";
+import type { Chapter, Course, Plan } from "../types";
 import { useLoad } from "../useLoad";
 
 export function CourseScreen() {
@@ -15,11 +16,12 @@ export function CourseScreen() {
   const c = course.data;
 
   return (
-    <Screen title={c?.name ?? "Μάθημα"} back="/" listen={c ? [{ text: `${c.name}. ${c.chapters} κεφάλαια.` }] : undefined}>
+    <Screen title={c?.name ?? "Μάθημα"} back="/courses" listen={c ? [{ text: `${c.name}. ${c.chapters} κεφάλαια.` }] : undefined}>
       {course.error && <Notice tone="error" live>{course.error}</Notice>}
       {!c && !course.error && <Loading />}
       {c && (
         <>
+          {c.from_eclass && <TeachingPlan courseId={c.id} />}
           <p>Κάθε ενότητα έχει τον δικό της τρόπο μελέτης. Όλες ξεκινούν «Με πολλή υποστήριξη».</p>
           <section aria-labelledby="chapters-title">
             <h2 id="chapters-title">Κεφάλαια</h2>
@@ -84,7 +86,7 @@ export function DeleteCourse() {
   const remove = async () => {
     try {
       await api.del(`/courses/${id}`);
-      navigate("/", { replace: true });
+      navigate("/courses", { replace: true });
     } catch (err) {
       setError(errorText(err));
     }
@@ -108,5 +110,94 @@ export function DeleteCourse() {
         </button>
       </div>
     </Screen>
+  );
+}
+
+/** Where teaching is (from the student's answers, or the syllabus), what has been studied,
+ *  and one suggested next step. The student can correct where teaching is. */
+function TeachingPlan({ courseId }: { courseId: number }) {
+  const navigate = useNavigate();
+  const clock = useClock();
+  const { data: plan, setData } = useLoad<Plan>(`/courses/${courseId}/plan?${clock.query}`);
+  const [editing, setEditing] = useState(false);
+  const [unit, setUnit] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!plan) return null;
+
+  const save = async () => {
+    if (unit === null) return;
+    try {
+      setData(await api.post<Plan>(`/courses/${courseId}/teaching?${clock.query}`, { unit_id: unit }));
+      setEditing(false);
+      setError(null);
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
+
+  return (
+    <section className="panel" aria-labelledby="plan-title">
+      <h2 id="plan-title">Πού είναι η διδασκαλία</h2>
+      {plan.teaching ? (
+        <p>
+          <strong>Στο μάθημα:</strong> {plan.teaching.title} (εβδομάδα {plan.teaching.week}).{" "}
+          {plan.teaching_from === "confirmed" ? "Από τις απαντήσεις σου." : "Από το πλάνο του μαθήματος."}
+        </p>
+      ) : (
+        <p>Η διδασκαλία δεν έχει ξεκινήσει ακόμα.</p>
+      )}
+      {plan.with_material > 0 && <p><strong>Έχεις μελετήσει:</strong> {plan.studied} από {plan.with_material} ενότητες.</p>}
+      {plan.next && (
+        <div className="actions">
+          <button type="button" className="btn btn-primary" onClick={() => navigate(`/sections/${plan.next!.section_id}`)}>
+            <BookOpen aria-hidden="true" />
+            {plan.next.text}
+          </button>
+        </div>
+      )}
+      <ul className="plan-units">
+        {plan.units.map((u) => (
+          <li key={u.unit_id}>
+            {u.taught ? <CircleCheck aria-hidden="true" className="ok" /> : <Circle aria-hidden="true" />}
+            <span className="plan-title">{u.title}</span>
+            <span className="plan-status">
+              {u.taught ? "Έγινε στο μάθημα" : `Εβδομάδα ${u.week}`}
+              {u.studied && " · Το μελέτησες"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {!editing ? (
+        <button type="button" className="btn" onClick={() => { setUnit(plan.teaching?.unit_id ?? null); setEditing(true); }}>
+          <Pencil aria-hidden="true" />
+          Άλλαξε πού είναι η διδασκαλία
+        </button>
+      ) : (
+        <>
+          <fieldset className="field">
+            <legend>Μέχρι ποια ενότητα έχει γίνει στο μάθημα;</legend>
+            <div className="radio-cards">
+              {plan.units.map((u) => (
+                <label key={u.unit_id} className={`radio-card ${unit === u.unit_id ? "is-on" : ""}`}>
+                  <input type="radio" name="teaching" checked={unit === u.unit_id} onChange={() => setUnit(u.unit_id)} />
+                  <span>{u.title}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {error && <Notice tone="error" live>{error}</Notice>}
+          <div className="actions actions-row">
+            <button type="button" className="btn btn-primary" onClick={save} disabled={unit === null}>
+              <Check aria-hidden="true" />
+              Αποθήκευση
+            </button>
+            <button type="button" className="btn" onClick={() => setEditing(false)}>
+              <X aria-hidden="true" />
+              Άκυρο
+            </button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

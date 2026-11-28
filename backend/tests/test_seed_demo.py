@@ -11,7 +11,8 @@ from scripts.pdfgen import build_pdf
 from scripts.seed_demo import seed
 
 
-def test_demo_story(engine):
+def test_demo_story(engine, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.routers.courses.STORAGE_DIR", tmp_path)
     with Session(engine) as session:
         seed(session)
         progress = build_progress(session, date.today())

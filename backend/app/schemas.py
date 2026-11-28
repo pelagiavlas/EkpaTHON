@@ -67,6 +67,12 @@ class CourseOut(BaseModel):
     icon: str
     chapters: int
     proposals: int  # sections with a proposal waiting for an answer
+    from_eclass: bool = False
+    teaching: str | None = None  # "Στο μάθημα: 3.4 ... (εβδομάδα 9)"
+    studied: int = 0  # sections with material the student has opened or answered
+    with_material: int = 0
+    next_section_id: int | None = None
+    next_text: str | None = None  # "Θες να δεις την ενότητα 3.3...;"
 
 
 class SectionSummary(BaseModel):
@@ -299,3 +305,100 @@ class SupporterOut(BaseModel):
     token: str
     created_at: datetime
     active: bool
+
+
+# --- eClass and "Σήμερα" -------------------------------------------------------
+
+class NextClassOut(BaseModel):
+    course_id: int
+    course_name: str
+    day: date
+    weekday: str
+    is_today: bool
+    start: str
+    end: str
+    room: str
+    phase: Literal["before", "during", "later"]
+
+
+class BeforeClassOut(BaseModel):
+    course_id: int
+    course_name: str
+    unit_id: int
+    unit_title: str
+    section_id: int | None  # None: the material is not on eClass yet
+    minutes: int | None
+
+
+class UnitChoice(BaseModel):
+    unit_id: int
+    title: str
+
+
+class AfterClassOut(BaseModel):
+    course_id: int
+    course_name: str
+    class_date: date
+    when: str  # "Σήμερα" or "Την Τρίτη"
+    predicted: UnitChoice | None
+    units: list[UnitChoice]
+
+
+class NewMaterialOut(BaseModel):
+    document_id: int
+    course_name: str
+    title: str
+    added_on: date
+
+
+class TodayOut(BaseModel):
+    now: datetime
+    demo: bool
+    simulated_eclass: bool
+    next_class: NextClassOut | None
+    before: BeforeClassOut | None
+    after: AfterClassOut | None
+    new_material: list[NewMaterialOut]
+
+
+class ConfirmIn(BaseModel):
+    course_id: int
+    class_date: date
+    unit_id: int | None = None
+    status: Literal["done", "unknown"] = "done"
+
+
+class ConfirmOut(BaseModel):
+    status: str
+    unit_title: str | None
+    section_id: int | None  # for "Θες 2 ερωτήσεις...;"
+    has_questions: bool
+
+
+class PlanUnitOut(BaseModel):
+    unit_id: int
+    title: str
+    week: int
+    taught: bool
+    section_id: int | None
+    studied: bool
+
+
+class NextStepOut(BaseModel):
+    section_id: int
+    text: str
+
+
+class PlanOut(BaseModel):
+    teaching: dict | None
+    teaching_from: Literal["confirmed", "plan"]
+    week: int
+    units: list[PlanUnitOut]
+    studied: int
+    with_material: int
+    next: NextStepOut | None
+    simulated_eclass: bool
+
+
+class TeachingIn(BaseModel):
+    unit_id: int

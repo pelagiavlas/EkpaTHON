@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import { DemoFlagListener } from "./demo";
 import { Courses, NewCourse } from "./screens/Courses";
+import { TodayScreen } from "./screens/Today";
 import { CourseScreen, DeleteCourse } from "./screens/Course";
 import { UploadScreen } from "./screens/Upload";
 import { ChapterScreen } from "./screens/Chapter";
@@ -13,7 +14,7 @@ import { SupporterScreen } from "./screens/Supporter";
 import { AccessibilityStatement } from "./screens/Statement";
 import { NotFound } from "./screens/NotFound";
 
-// No questions and no test before first use: the app opens straight on the courses.
+// No questions and no test before first use: the app opens straight on "Σήμερα".
 export function App() {
   return (
     <>
@@ -22,7 +23,8 @@ export function App() {
       </a>
       <DemoFlagListener />
       <Routes>
-        <Route path="/" element={<Courses />} />
+        <Route path="/" element={<TodayScreen />} />
+        <Route path="/courses" element={<Courses />} />
         <Route path="/courses/new" element={<NewCourse />} />
         <Route path="/courses/:id" element={<CourseScreen />} />
         <Route path="/courses/:id/upload" element={<UploadScreen />} />

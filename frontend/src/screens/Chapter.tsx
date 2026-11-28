@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { api } from "../api";
 import { BookOpen, ChevronRight, CircleCheck } from "lucide-react";
 import { Screen } from "../components/Screen";
 import { LevelSteps, Loading, Notice } from "../components/common";
@@ -13,6 +15,11 @@ export function ChapterScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { data: chapter, error } = useLoad<Chapter>(`/documents/${id}`);
+
+  // Opened: no longer "Νέο υλικό".
+  useEffect(() => {
+    api.post(`/documents/${id}/seen`).catch(() => undefined);
+  }, [id]);
 
   return (
     <Screen

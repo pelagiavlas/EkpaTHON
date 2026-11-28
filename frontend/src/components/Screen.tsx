@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChartColumn, Settings as SettingsIcon, Square, Volume2 } from "lucide-react";
+import { ArrowLeft, BookOpen, ChartColumn, Settings as SettingsIcon, Square, Sun, Volume2 } from "lucide-react";
 import { useSpeech, type SpeechPart } from "../speech";
 
 interface ScreenProps {
@@ -67,6 +67,10 @@ export function Screen({ title, back, listen, autoRead = false, hideNav = false,
       {!hideNav && (
         <nav className="bottomnav" aria-label="Κύριο μενού">
           <NavLink to="/" end>
+            <Sun aria-hidden="true" />
+            <span>Σήμερα</span>
+          </NavLink>
+          <NavLink to="/courses">
             <BookOpen aria-hidden="true" />
             <span>Μαθήματα</span>
           </NavLink>
