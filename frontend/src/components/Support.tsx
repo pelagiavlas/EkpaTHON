@@ -27,7 +27,7 @@ export function SectionProposal({ support, onDone }: { support: Support; onDone:
       </h2>
       <p>{proposal.message}</p>
       <p>
-        <strong>Τι θα αλλάξει (επίπεδο {proposal.to_level}: {LEVELS[proposal.to_level].name}):</strong>{" "}
+        <strong>Τι θα αλλάξει («{LEVELS[proposal.to_level].name}»):</strong>{" "}
         {LEVELS[proposal.to_level].description}
       </p>
       <p>Τα γράμματα, τα χρώματα και ο ήχος μένουν όπως τα έχεις. Μπορείς να το αλλάξεις ξανά όποτε θέλεις.</p>

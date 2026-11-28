@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router-dom";
+import { DemoFlagListener } from "./demo";
 import { Courses, NewCourse } from "./screens/Courses";
 import { CourseScreen, DeleteCourse } from "./screens/Course";
 import { UploadScreen } from "./screens/Upload";
@@ -19,6 +20,7 @@ export function App() {
       <a className="skip-link" href="#main">
         Πήγαινε στο κύριο περιεχόμενο
       </a>
+      <DemoFlagListener />
       <Routes>
         <Route path="/" element={<Courses />} />
         <Route path="/courses/new" element={<NewCourse />} />

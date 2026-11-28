@@ -1,6 +1,7 @@
 """Study a section, answer questions, climb the hint ladder. Everything per section level."""
 
 import json
+import os
 import random
 import re
 from datetime import datetime
@@ -27,10 +28,15 @@ from app.schemas import (
 
 router = APIRouter(tags=["study & questions"])
 
+
+def demo_mode() -> bool:
+    """DEMO_MODE=true in backend/.env turns on the level preview for presentations."""
+    return os.getenv("DEMO_MODE", "false").strip().lower() in ("1", "true", "yes")
+
 STRATEGY_LABELS = {"listen": "Να ακούσεις το κείμενο", "image": "Να δεις την εικόνα", "example": "Το παράδειγμα"}
 LEVEL1_STEP3 = "Κοίτα ξανά τις δύο επιλογές. Διάβασέ τες ή άκουσέ τες μία-μία."
-FALL_BACK = "Ας το δούμε μαζί, με εξήγηση."
-NO_HELP_IN_EXAM = "Στην εξάσκηση δεν υπάρχει βοήθεια. Γράψε ό,τι θυμάσαι. Μετά βλέπεις τι περιμέναμε."
+FALL_BACK = "Τώρα με εξήγηση."
+NO_HELP_IN_EXAM = "Στην εξάσκηση δεν υπάρχει βοήθεια. Γράψε ό,τι θυμάσαι. Μετά βλέπεις το βασικό σημείο."
 TERM = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 
 
@@ -75,7 +81,7 @@ def study(section_id: int, session: Session = Depends(get_session)):
         next_id=siblings[index + 1] if index + 1 < len(siblings) else None,
         original=json.loads(section.paragraphs_json),
         easy=EasyOut(blocks=easy.blocks, glossary=easy.glossary, source=easy.source),
-        demo=service.has_simulated_data(session),
+        demo=demo_mode(),
     )
 
 
@@ -174,7 +180,7 @@ def questions(section_id: int, exam: bool = False, session: Session = Depends(ge
     _, course = _context(session, section)
     level = service.support(session, section.id).level
     if exam and level < 4:
-        raise HTTPException(409, "Η εξάσκηση σαν στις εξετάσεις υπάρχει στο επίπεδο 4.")
+        raise HTTPException(409, "Η εξάσκηση σαν στις εξετάσεις υπάρχει όταν μελετάς την ενότητα «Αυτόνομα».")
     mode = mode_for(level, exam)
     out = []
     for q in load_questions(session, section, level):
@@ -219,7 +225,7 @@ def start_attempt(question_id: int, exam: bool = False, session: Session = Depen
 def _open_attempt(session: Session, attempt_id: int) -> tuple[Attempt, Question | None, QuestionContent | None]:
     attempt = get_or_404(session, Attempt, attempt_id, "Δεν βρέθηκε η προσπάθεια")
     if attempt.correct is not None:
-        raise HTTPException(409, "Αυτή η ερώτηση έχει τελειώσει. Πάμε στην επόμενη.")
+        raise HTTPException(409, "Αυτή η ερώτηση έχει τελειώσει. Συνέχισε στην επόμενη.")
     if attempt.question_id is None:
         return attempt, None, None
     question = session.get(Question, attempt.question_id)
@@ -406,7 +412,7 @@ def explain(attempt_id: int, session: Session = Depends(get_session)):
     """The explanation is shown only after the student has tried at least once."""
     attempt, _, content = _open_attempt(session, attempt_id)
     if content is None or (attempt.wrong_tries == 0 and not attempt.awaiting_self_check):
-        raise HTTPException(409, "Πρώτα δοκίμασε μία απάντηση. Μετά σου δείχνω την εξήγηση.")
+        raise HTTPException(409, "Πρώτα δοκίμασε μία απάντηση. Μετά θα δεις την εξήγηση.")
     proposal, ms = _finish(session, attempt, False)
     return AnswerOut(outcome="explained", message=answers.EXPLAINED, key_point=content.key_point, done=True,
                      proposal=proposal, new_milestones=ms)

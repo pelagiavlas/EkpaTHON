@@ -25,7 +25,7 @@ class ScannedPdfError(PdfError):
 
 class InvalidPdfError(PdfError):
     def __init__(self):
-        super().__init__("Δεν μπορώ να ανοίξω αυτό το αρχείο. Είναι σίγουρα PDF;")
+        super().__init__("Αυτό το αρχείο δεν ανοίγει. Είναι σίγουρα PDF;")
 
 
 @dataclass

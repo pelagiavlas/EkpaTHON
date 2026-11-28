@@ -24,7 +24,7 @@ export function ChapterScreen() {
       {!chapter && !error && <Loading />}
       {chapter && (
         <>
-          <p>Το κεφάλαιο έχει {chapter.sections.length} μικρές ενότητες. Κάθε ενότητα έχει το δικό της επίπεδο βοήθειας.</p>
+          <p>Το κεφάλαιο έχει {chapter.sections.length} μικρές ενότητες. Κάθε ενότητα έχει τον δικό της τρόπο μελέτης.</p>
           <ol className="cards">
             {chapter.sections.map((s, i) => (
               <li key={s.id}>

@@ -11,6 +11,7 @@ import { sectionLabel } from "./Chapter";
 import { useSettings } from "../settings";
 import type { Milestone, Study, Support } from "../types";
 import { useLoad } from "../useLoad";
+import { useDemoMode } from "../demo";
 
 /** How the LEARNING support looks at each level. Accessibility settings are not here on purpose:
  *  letters, spacing, colours, voice and motion come only from the student's settings. */
@@ -34,6 +35,7 @@ function StudySection({ id }: { id: string }) {
   const navigate = useNavigate();
   const { settings } = useSettings();
   const { data, error } = useLoad<Study>(`/sections/${id}/study`);
+  const demo = useDemoMode(data?.demo ?? false);
   const [support, setSupport] = useState<Support | null>(null);
   const [preview, setPreview] = useState<number | null>(null);
   const [mode, setMode] = useState<"easy" | "original" | null>(null);
@@ -106,7 +108,7 @@ function StudySection({ id }: { id: string }) {
           </p>
           <div className="level-row">
             <LevelSteps level={realLevel} compact />
-            <Link className="text-link" to={`/sections/${id}/level`}>Άλλαξε επίπεδο</Link>
+            <Link className="text-link" to={`/sections/${id}/level`}>Άλλαξε τρόπο μελέτης</Link>
           </div>
 
           {preview === null && (
@@ -121,7 +123,7 @@ function StudySection({ id }: { id: string }) {
           )}
           <MilestoneNotes items={milestones} />
 
-          {data.demo && <LevelPreview value={preview} real={realLevel} onChange={(l) => { setPreview(l); setMode(null); setPage(0); }} />}
+          {demo && <LevelPreview value={preview} real={realLevel} onChange={(l) => { setPreview(l); setMode(null); setPage(0); }} />}
 
           {/* "Εύκολο κείμενο" is always here, at every level, in the same place. */}
           <div className="toggle" role="group" aria-label="Πώς θέλεις να δεις το κείμενο">
@@ -174,7 +176,7 @@ function StudySection({ id }: { id: string }) {
             {lastPage ? (
               <button type="button" className="btn btn-primary" onClick={() => navigate(`/sections/${id}/questions`)}>
                 {realLevel >= 4 ? <PenLine aria-hidden="true" /> : <CircleHelp aria-hidden="true" />}
-                {realLevel >= 4 ? "Τι κράτησες;" : "Πάμε στις ερωτήσεις"}
+                {realLevel >= 4 ? "Τι κράτησες;" : "Συνέχεια στις ερωτήσεις"}
               </button>
             ) : (
               <button type="button" className="btn btn-primary" onClick={() => setPage(safePage + 1)}>
@@ -195,7 +197,7 @@ function StudySection({ id }: { id: string }) {
   );
 }
 
-/** Only with simulated (demo) data: see the same section as it looks at another level.
+/** Only in demo mode (?demo=1 or DEMO_MODE=true): see the same section as it looks at another level.
  *  Nothing is saved, the real level does not change. */
 function LevelPreview({ value, real, onChange }: { value: number | null; real: number; onChange: (l: number | null) => void }) {
   return (
@@ -204,18 +206,18 @@ function LevelPreview({ value, real, onChange }: { value: number | null; real: n
         <Eye aria-hidden="true" />
         Προεπισκόπηση για την παρουσίαση
       </h2>
-      <div className="toggle" role="group" aria-label="Δες την ενότητα σε επίπεδο">
+      <div className="toggle" role="group" aria-label="Δες την ενότητα με άλλο τρόπο μελέτης">
         {[1, 2, 3, 4].map((l) => (
           <button key={l} type="button" className="btn btn-toggle" aria-pressed={(value ?? real) === l}
             onClick={() => onChange(l === real ? null : l)}>
-            Επίπεδο {l}
+            {LEVELS[l].name}
           </button>
         ))}
       </div>
       {value !== null && (
         <Notice icon={Eye} live>
           <p>
-            Έτσι φαίνεται η ενότητα στο επίπεδο {value}: {LEVELS[value].name}. Το πραγματικό επίπεδο ({real}) δεν αλλάζει.
+            Έτσι φαίνεται η ενότητα «{LEVELS[value].name}». Ο πραγματικός τρόπος μελέτης («{LEVELS[real].name}») δεν αλλάζει.
           </p>
         </Notice>
       )}
@@ -241,8 +243,8 @@ export function ChangeLevel() {
   };
 
   return (
-    <Screen title="Άλλαξε επίπεδο βοήθειας" back={`/sections/${id}`}>
-      <p>Το επίπεδο αλλάζει μόνο για αυτή την ενότητα. Τα γράμματα, τα χρώματα και ο ήχος μένουν όπως τα έχεις.</p>
+    <Screen title="Άλλαξε τρόπο μελέτης" back={`/sections/${id}`}>
+      <p>Η αλλαγή ισχύει μόνο για αυτή την ενότητα. Τα γράμματα, τα χρώματα και ο ήχος μένουν όπως τα έχεις.</p>
       {support && <LevelChoice value={chosen} onChange={setLevel} />}
       {error && <Notice tone="error" live>{error}</Notice>}
       <div className="actions">

@@ -22,19 +22,19 @@ export function CourseIcon({ name }: { name: string }) {
 // What each level changes. Only learning support: never letters, spacing, colours, voice or motion.
 export const LEVELS: Record<number, { name: string; description: string }> = {
   1: {
-    name: "Πλήρης βοήθεια",
+    name: "Με πολλή υποστήριξη",
     description: "Εύκολο κείμενο σε μικρά κομμάτια, με εικόνα και παράδειγμα. Οι δύσκολες λέξεις εξηγούνται μέσα στο κείμενο. Ερωτήσεις με 2 επιλογές.",
   },
   2: {
-    name: "Καθοδηγούμενη βοήθεια",
+    name: "Με λιγότερη υποστήριξη",
     description: "Εύκολο κείμενο σε μεγαλύτερα κομμάτια. Εικόνες μόνο στα δύσκολα. Πατάς μια λέξη για να δεις τι σημαίνει. Ερωτήσεις με 3 επιλογές.",
   },
   3: {
-    name: "Ψάχνω στο κείμενο",
+    name: "Από το πρωτότυπο",
     description: "Πρώτα το πρωτότυπο κείμενο. Το Εύκολο κείμενο είναι ένα πάτημα μακριά. Γράφεις την απάντηση. Οι υποδείξεις σού δείχνουν πού να ψάξεις.",
   },
   4: {
-    name: "Αυτονομία",
+    name: "Αυτόνομα",
     description: "Το πρωτότυπο κείμενο, χωρίς προσθήκες. Γράφεις τα βασικά σημεία ή μια δική σου ερώτηση. Βοήθεια μόνο όταν τη ζητήσεις.",
   },
 };
@@ -57,7 +57,7 @@ export function LevelSteps({ level, compact = false }: { level: number; compact?
         ))}
       </svg>
       <span>
-        <strong>Επίπεδο {level} από 4:</strong> {LEVELS[level]?.name}
+        <strong>Τρόπος μελέτης:</strong> {LEVELS[level]?.name}
         {!compact && <span className="level-desc">{LEVELS[level]?.description}</span>}
       </span>
     </div>
@@ -84,7 +84,7 @@ export function Notice({ tone = "info", icon: Icon = Info, children, live = fals
   );
 }
 
-export function Loading({ text = "Περίμενε λίγο, φορτώνει..." }: { text?: string }) {
+export function Loading({ text = "Φορτώνει..." }: { text?: string }) {
   return (
     <p className="loading" role="status">
       {text}

@@ -122,7 +122,7 @@ async def upload_document(course_id: int, file: UploadFile, session: Session = D
     except PdfError as err:
         raise HTTPException(422, str(err))
     if not sections:
-        raise HTTPException(422, "Δεν βρήκα κείμενο σε αυτό το PDF. Δοκίμασε άλλο.")
+        raise HTTPException(422, "Δεν βρέθηκε κείμενο σε αυτό το PDF. Δοκίμασε άλλο.")
 
     sha = hashlib.sha256(data).hexdigest()
     doc = session.exec(select(Document).where(Document.course_id == course_id, Document.sha256 == sha)).first()

@@ -28,6 +28,10 @@ async function check(page, name, theme, device) {
   await page.waitForTimeout(150);
   const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   results.push({ name, theme, device, violations });
+  // Tone: students never see a level number, diminutives or school phrasing.
+  const text = await page.evaluate(() => document.body.innerText);
+  const bad = text.match(/[Εε]πίπεδο\s*\d|χεράκ|Μαθαίνουμε/);
+  if (bad) problems.push(`[${device}/${theme}] ${name}: «${bad[0]}» στο κείμενο`);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, `${device}-${theme}-${name}.png`), fullPage: true });
 }
 
@@ -74,8 +78,14 @@ async function run(theme, device) {
   // --- Level 1 (3.4): Easy-to-Read, explaining hints -------------------------------------------
   await setLevel(sec["3.4"], 1);
   await go(`/sections/${sec["3.4"]}`, "study-level1");
-  await page.getByRole("button", { name: "Επίπεδο 3" }).click();
-  await check(page, "study-preview-level3", theme, device);
+  if (await page.getByText("Προεπισκόπηση για την παρουσίαση").count()) {
+    problems.push(`[${device}/${theme}] the level preview is on the page outside demo mode`);
+  }
+  await page.goto(`${BASE}/sections/${sec["3.4"]}?demo=1`);
+  const preview = page.getByRole("group", { name: "Δες την ενότητα με άλλο τρόπο μελέτης" });
+  await preview.getByRole("button", { name: "Από το πρωτότυπο" }).click();
+  await check(page, "study-preview-original", theme, device);
+  await page.goto(`${BASE}/?demo=0`);
   await page.goto(`${BASE}/sections/${sec["3.4"]}/questions`);
   await page.getByRole("button", { name: "Βοήθεια" }).waitFor();
   await page.getByRole("button", { name: "Βοήθεια" }).click();
@@ -90,11 +100,11 @@ async function run(theme, device) {
   // --- Same topic (3.2): a proposal; the student says yes -------------------------------------
   await page.goto(`${BASE}/sections/${sec["3.2"]}`);
   const yes = page.getByRole("button", { name: "Ναι, ας δοκιμάσω" });
-  await page.getByRole("link", { name: "Άλλαξε επίπεδο" }).waitFor();
+  await page.getByRole("link", { name: "Άλλαξε τρόπο μελέτης" }).waitFor();
   if (await yes.isVisible().catch(() => false)) {
     await check(page, "study-same-topic-proposal", theme, device);
     await yes.click();
-    await page.getByText("Επίπεδο 3 από 4:").first().waitFor();
+    await page.locator(".level", { hasText: "Από το πρωτότυπο" }).first().waitFor();
   } else {
     await setLevel(sec["3.2"], 3);
     await page.reload();
@@ -105,7 +115,7 @@ async function run(theme, device) {
   await page.goto(`${BASE}/sections/${sec["3.2"]}/questions`);
   await page.getByRole("heading", { level: 1, name: /Πριν τις ερωτήσεις|Ερώτηση 1/ }).waitFor();
   if (await page.getByRole("heading", { name: "Πριν τις ερωτήσεις" }).isVisible()) {
-    await page.getByRole("button", { name: "Πάμε στις ερωτήσεις" }).click();
+    await page.getByRole("button", { name: "Συνέχεια στις ερωτήσεις" }).click();
   }
   await page.getByRole("button", { name: "Βοήθεια" }).waitFor();
   for (const step of [1, 2, 3]) {
@@ -129,7 +139,7 @@ async function run(theme, device) {
   await go(`/sections/${sec["3.3"]}/questions`, "level4-menu");
   await page.getByRole("button", { name: "Γράψε τα βασικά σημεία" }).click();
   await page.getByLabel("Γράψε με δικά σου λόγια τα βασικά σημεία της ενότητας").fill("Μέση τιμή μείον και συν το περιθώριο.");
-  await page.getByRole("button", { name: "Δες τι περιμέναμε" }).click();
+  await page.getByRole("button", { name: "Δες τα βασικά σημεία" }).click();
   await page.getByText("Τα είχες;").waitFor();
   await check(page, "level4-keypoints", theme, device);
   await page.goto(`${BASE}/sections/${sec["3.3"]}/questions`);

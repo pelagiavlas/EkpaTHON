@@ -73,7 +73,7 @@ export function UploadScreen() {
         )}
         {busy && (
           <p className="loading" role="status">
-            Διαβάζω το PDF και το χωρίζω σε μικρές ενότητες...
+            Το PDF διαβάζεται και χωρίζεται σε μικρές ενότητες...
           </p>
         )}
         <div className="actions">

@@ -112,7 +112,7 @@ function QuestionsFlow({ sectionId }: { sectionId: string }) {
         <div className="actions">
           <button type="button" className="btn btn-primary" onClick={() => setPhase(data.questions.length ? "question" : "done")}>
             <ChevronRight aria-hidden="true" />
-            Πάμε στις ερωτήσεις
+            Συνέχεια στις ερωτήσεις
           </button>
           {strategy.choice === "listen" && study.data && (
             <button type="button" className="btn" onClick={() => speech.speak(study.data!.original.map((text) => ({ text })))}>
@@ -164,7 +164,7 @@ function QuestionsFlow({ sectionId }: { sectionId: string }) {
 function Finished({ data, study, back }: { data: Questions; study: Study | null; back: string }) {
   const navigate = useNavigate();
   const { settings } = useSettings();
-  const text = data.questions.length ? "Τελείωσες τις ερωτήσεις αυτής της ενότητας." : "Για αυτή την ενότητα δεν έχουμε ερωτήσεις.";
+  const text = data.questions.length ? "Τελείωσες τις ερωτήσεις αυτής της ενότητας." : "Αυτή η ενότητα δεν έχει ερωτήσεις.";
   const next = study?.next_id;
   return (
     <Screen title="Τέλος ερωτήσεων" back={back} autoRead={settings.autoRead} listen={[{ text }]}>
@@ -479,7 +479,7 @@ function Level4Menu({ sectionId, back, hasQuestions, onPick }: {
   ];
   return (
     <Screen title="Τι κράτησες;" back={back} listen={[{ text: `Τι κράτησες; Διάλεξε: ${choices.map((c) => c.label).join(". ")}.` }]}>
-      <p>Διάλεξε εσύ τι θέλεις να κάνεις με αυτή την ενότητα.</p>
+      <p>Διάλεξε τι θέλεις να κάνεις με αυτή την ενότητα.</p>
       <div className="choices" role="group" aria-label="Τι θέλεις να κάνεις;" data-section={sectionId}>
         {choices.map(({ key, label, icon: Icon }) => (
           <button key={key} type="button" className="btn btn-choice" onClick={() => onPick(key)}>
@@ -528,7 +528,7 @@ function KeyPoints({ sectionId, back, onDone }: { sectionId: string; back: () =>
             {error && <p id="keypoints-error" className="field-error" role="alert">{error}</p>}
           </div>
           <div className="actions">
-            <button type="submit" className="btn btn-primary"><Send aria-hidden="true" />Δες τι περιμέναμε</button>
+            <button type="submit" className="btn btn-primary"><Send aria-hidden="true" />Δες τα βασικά σημεία</button>
           </div>
         </form>
       ) : (
@@ -584,7 +584,7 @@ function OwnQuestion({ sectionId, back }: { sectionId: string; back: () => void 
 
   return (
     <Screen title="Μια δική σου ερώτηση" back={back}>
-      <p>Τι θα ρωτούσες εσύ για αυτή την ενότητα; Μια καλή ερώτηση δείχνει ότι κατάλαβες το θέμα.</p>
+      <p>Τι θα ρωτούσες για αυτή την ενότητα; Οι ερωτήσεις σου μένουν εδώ για την επόμενη φορά.</p>
       <form onSubmit={save} noValidate>
         <div className="field">
           <label htmlFor="own-question">Η ερώτησή σου</label>
@@ -620,7 +620,7 @@ function StrategyQuestion({ courseId, back, onDone }: { courseId: number; back: 
   return (
     <Screen title="Τι σε βοήθησε σήμερα;" back={back}
       listen={[{ text: `Τι σε βοήθησε σήμερα; ${choices.map((c) => c.label).join(". ")}.` }]}>
-      <p>Θα σου το θυμίσουμε την επόμενη φορά.</p>
+      <p>Θα το δεις ξανά την επόμενη φορά.</p>
       <div className="choices" role="group" aria-label="Τι σε βοήθησε σήμερα;">
         {choices.map(({ key, label, icon: Icon }) => (
           <button key={key} type="button" className="btn btn-choice" onClick={() => pick(key)}>

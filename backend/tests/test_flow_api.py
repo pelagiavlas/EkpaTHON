@@ -76,6 +76,22 @@ def test_study_shows_easy_read_and_original(setup):
     assert study["demo"] is False
 
 
+def test_level_preview_only_in_demo_mode(setup, monkeypatch):
+    client, _, _, sections = setup
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+    assert client.get(f"/api/sections/{sections['3.4']}/study").json()["demo"] is False
+    monkeypatch.setenv("DEMO_MODE", "true")
+    assert client.get(f"/api/sections/{sections['3.4']}/study").json()["demo"] is True
+
+
+def test_students_see_ways_of_studying_not_level_numbers(setup):
+    client, _, doc, sections = setup
+    names = {s["level_name"] for s in doc["sections"]}
+    assert names == {"Με πολλή υποστήριξη"}
+    for level, name in [(2, "Με λιγότερη υποστήριξη"), (3, "Από το πρωτότυπο"), (4, "Αυτόνομα")]:
+        assert set_level(client, sections["3.4"], level)["level_name"] == name
+
+
 # --- levels 1-2: hints that explain ----------------------------------------------------
 
 def test_level_1_two_choices_and_the_answer_never_sent(setup):
@@ -83,7 +99,7 @@ def test_level_1_two_choices_and_the_answer_never_sent(setup):
     data, q, _ = start(client, sections["3.4"])
     assert data["level"] == 1 and q["mode"] == "choice" and len(q["options"]) == 2
     raw = json.dumps(data, ensure_ascii=False)
-    for secret in ("key_point", "accept", "hints", "source_sentence", "Όταν ρωτάμε περισσότερους"):
+    for secret in ("key_point", "accept", "hints", "source_sentence", "Όταν ρωτάς περισσότερους"):
         assert secret not in raw
 
 
@@ -114,6 +130,7 @@ def test_wrong_answer_is_neutral_and_explanation_only_after_trying(setup):
     result = client.post(f"/api/attempts/{attempt}/answer", json={"option_id": wrong["id"]}).json()
     assert result["outcome"] == "try_again" and result["key_point"] is None
     assert "Λάθος" not in result["message"]
+    assert result["message"] == "Όχι ακόμα. Ζήτησε υπόδειξη ή δοκίμασε ξανά."
     assert client.post(f"/api/attempts/{attempt}/explain").json()["key_point"]
 
 

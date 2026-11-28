@@ -108,7 +108,7 @@ export function SettingsText() {
           { value: 2, label: "Περισσότερος" },
           { value: 2.4, label: "Πολύς" },
         ]} />
-      <p className="preview">Δείγμα: Ρωτάμε λίγους ανθρώπους. Αυτοί λέγονται δείγμα. Από αυτούς μαθαίνουμε κάτι για όλους.</p>
+      <p className="preview">Δείγμα: Ρωτάς λίγους ανθρώπους. Αυτοί λέγονται δείγμα. Από αυτούς βγαίνουν συμπεράσματα για όλους.</p>
       {status}
     </Screen>
   );
@@ -147,7 +147,7 @@ export function SettingsSound() {
       )}
       {speech.supported && !speech.hasGreek && (
         <Notice tone="calm">
-          <p>Δεν βρήκαμε ελληνική φωνή σε αυτή τη συσκευή. Μπορείς να προσθέσεις ελληνική φωνή από τις ρυθμίσεις της συσκευής.</p>
+          <p>Δεν βρέθηκε ελληνική φωνή σε αυτή τη συσκευή. Μπορείς να προσθέσεις ελληνική φωνή από τις ρυθμίσεις της συσκευής.</p>
         </Notice>
       )}
       <OptionGroup legend="Να εμφανίζεται το κουμπί «Άκου»;" name="read" value={settings.readAloud}
@@ -162,7 +162,7 @@ export function SettingsSound() {
         ]} />
       <div className="actions">
         <button type="button" className="btn" disabled={!speech.supported}
-          onClick={() => speech.speak("Έτσι ακούγεται η φωνή. Ρωτάμε λίγους ανθρώπους. Αυτοί λέγονται δείγμα.")}>
+          onClick={() => speech.speak("Έτσι ακούγεται η φωνή. Ρωτάς λίγους ανθρώπους. Αυτοί λέγονται δείγμα.")}>
           <Volume2 aria-hidden="true" />
           Δοκίμασε τη φωνή
         </button>

@@ -19,8 +19,8 @@ MILESTONES = {
     "first_original": "Πρώτη ενότητα που διάβασες από το πρωτότυπο κείμενο.",
     "first_no_help": "Πρώτη σωστή απάντηση χωρίς καμία βοήθεια.",
     "first_found_sentence": "Πρώτη φορά που βρήκες την πρόταση στο κείμενο χωρίς εξήγηση.",
-    "first_level3": "Πρώτη ενότητα στο επίπεδο 3: ψάχνεις στο κείμενο.",
-    "first_level4": "Πρώτη ενότητα στο επίπεδο 4: αυτονομία.",
+    "first_level3": "Πρώτη ενότητα που μελετάς «Από το πρωτότυπο».",
+    "first_level4": "Πρώτη ενότητα που μελετάς «Αυτόνομα».",
     "first_exam": "Πρώτη εξάσκηση σαν στις εξετάσεις.",
 }
 
@@ -48,7 +48,7 @@ def proposal_out(sup: SectionSupport) -> ProposalOut | None:
         reason=sup.proposal_reason or "",
         from_level=sup.level,
         to_level=sup.proposal_to,
-        message=PROPOSAL_MESSAGES.get(sup.proposal_reason or "", "Θες να αλλάξεις το επίπεδο βοήθειας;"),
+        message=PROPOSAL_MESSAGES.get(sup.proposal_reason or "", "Θες να αλλάξεις τον τρόπο μελέτης;"),
     )
 
 
@@ -192,7 +192,7 @@ def progress_message(previous: float | None, current: float | None, current_coun
             "Όταν απαντήσεις μερικές ερωτήσεις, εδώ θα βλέπεις πώς αλλάζει η βοήθεια που χρειάζεσαι."
     if current is None:
         return "Αυτή την εβδομάδα δεν υπάρχουν ακόμα απαντήσεις." if impersonal else \
-            "Αυτή την εβδομάδα δεν έχεις απαντήσει ακόμα ερωτήσεις. Όποτε θέλεις, συνεχίζουμε."
+            "Αυτή την εβδομάδα δεν έχεις απαντήσει ακόμα ερωτήσεις. Μπορείς να συνεχίσεις όποτε θέλεις."
     if previous is None or previous == 0:
         return f"Αυτή την εβδομάδα απαντήθηκαν {current_count} ερωτήσεις." if impersonal else \
             f"Αυτή την εβδομάδα απάντησες {current_count} ερωτήσεις. Την επόμενη εβδομάδα θα δεις τη σύγκριση."

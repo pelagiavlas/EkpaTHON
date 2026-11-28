@@ -20,7 +20,7 @@ export function CourseScreen() {
       {!c && !course.error && <Loading />}
       {c && (
         <>
-          <p>Κάθε ενότητα έχει το δικό της επίπεδο βοήθειας. Όλες ξεκινούν από την πλήρη βοήθεια.</p>
+          <p>Κάθε ενότητα έχει τον δικό της τρόπο μελέτης. Όλες ξεκινούν «Με πολλή υποστήριξη».</p>
           <section aria-labelledby="chapters-title">
             <h2 id="chapters-title">Κεφάλαια</h2>
             {chapters.data?.length === 0 && <p>Δεν έχεις ανεβάσει ακόμα κεφάλαιο. Ανέβασε το PDF του μαθήματος.</p>}
@@ -59,7 +59,7 @@ export function CourseScreen() {
 export function LevelChoice({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
     <fieldset className="field">
-      <legend>Διάλεξε επίπεδο βοήθειας</legend>
+      <legend>Διάλεξε τρόπο μελέτης</legend>
       <div className="radio-cards">
         {[1, 2, 3, 4].map((n) => (
           <label key={n} className={`radio-card ${value === n ? "is-on" : ""}`}>

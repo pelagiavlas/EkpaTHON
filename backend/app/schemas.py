@@ -110,7 +110,7 @@ class StudyOut(BaseModel):
     next_id: int | None
     original: list[str]
     easy: EasyOut
-    demo: bool  # simulated data present: the level preview for the presentation is offered
+    demo: bool  # DEMO_MODE=true: the level preview for the presentation is offered
 
 
 class VisitOut(BaseModel):

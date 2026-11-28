@@ -12,11 +12,11 @@ from app.content.rules import strip_accents
 from app.content.schema import QuestionContent
 
 CORRECT = "Σωστά. Το βρήκες."
-TRY_AGAIN = "Ας το δούμε μαζί. Μπορείς να ζητήσεις βοήθεια ή να δοκιμάσεις ξανά."
-SELF_CHECK = "Δες τι περιμέναμε. Είναι κοντά σε αυτό που έγραψες;"
+TRY_AGAIN = "Όχι ακόμα. Ζήτησε υπόδειξη ή δοκίμασε ξανά."
+SELF_CHECK = "Αυτό είναι το βασικό σημείο. Είναι κοντά σε αυτό που έγραψες;"
 SELF_CHECK_YES = "Ωραία. Το βρήκες."
 SELF_CHECK_NO = "Εντάξει. Τώρα το ξέρεις για την επόμενη φορά."
-EXPLAINED = "Ας το δούμε μαζί."
+EXPLAINED = "Δες την εξήγηση."
 KEYPOINTS_YES = "Ωραία. Τα βασικά σημεία τα είχες."
 KEYPOINTS_NO = "Εντάξει. Τώρα τα έχεις όλα μπροστά σου."
 

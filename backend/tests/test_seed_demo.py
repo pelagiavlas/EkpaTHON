@@ -28,7 +28,8 @@ def test_demo_story(engine):
     assert "λιγότερη βοήθεια" in stats.message
 
 
-def test_live_upload_after_demo_offers_level_3_for_known_topics(client, engine):
+def test_live_upload_after_demo_offers_level_3_for_known_topics(client, engine, monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", "true")
     with Session(engine) as session:
         seed(session)
     course = next(c for c in client.get("/api/courses").json() if c["name"] == "Στατιστική")

@@ -5,7 +5,7 @@ import { Screen } from "../components/Screen";
 export function NotFound() {
   const navigate = useNavigate();
   return (
-    <Screen title="Δεν βρήκαμε αυτή τη σελίδα" back="/">
+    <Screen title="Η σελίδα δεν βρέθηκε" back="/">
       <p>Ίσως ο σύνδεσμος δεν ισχύει πια.</p>
       <div className="actions">
         <button type="button" className="btn btn-primary" onClick={() => navigate("/")}>

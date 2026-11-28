@@ -137,6 +137,7 @@ def main() -> int:
     pdf = make_demo_pdf()
     print("Έτοιμο το demo (ΠΡΟΣΟΜΟΙΩΜΕΝΑ δεδομένα 2 εβδομάδων).")
     print(f"PDF για το ζωντανό ανέβασμα: {pdf}")
+    print("Για την προεπισκόπηση στην παρουσίαση: DEMO_MODE=true στο backend/.env ή ?demo=1 στο URL.")
     return 0
 
 

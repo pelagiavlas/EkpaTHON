@@ -6,7 +6,7 @@ export class ApiError extends Error {
   }
 }
 
-const OFFLINE = "Δεν βρίσκω την εφαρμογή στον υπολογιστή. Έλεγξε ότι τρέχει ο server και δοκίμασε ξανά.";
+const OFFLINE = "Η εφαρμογή δεν απαντά. Έλεγξε ότι τρέχει ο server και δοκίμασε ξανά.";
 const GENERIC = "Κάτι δεν πήγε καλά. Δοκίμασε ξανά.";
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {

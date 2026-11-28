@@ -143,7 +143,7 @@ def make_hints(question: QuestionContent) -> list[Hint]:
     step4 = (
         f"Η λέξη που ψάχνεις σημαίνει: {gloss}. Ποια λέξη έχει αυτό το νόημα;"
         if gloss
-        else "Διάβασε ξανά το σημαντικό κομμάτι της ενότητας, με τη δική σου σειρά."
+        else "Διάβασε ξανά το «Σημαντικό» της ενότητας."
     )
     return [
         Hint(step=1, text=f"Η απάντηση είναι {where}. Θες να την ανοίξεις;", action="open_section"),

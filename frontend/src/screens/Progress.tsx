@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { CircleCheck, Flag, Hand, Info, TrendingDown } from "lucide-react";
 import { Screen } from "../components/Screen";
-import { CourseIcon, LevelSteps, Loading, Notice } from "../components/common";
+import { CourseIcon, LEVELS, LevelSteps, Loading, Notice } from "../components/common";
 import { useSettings } from "../settings";
 import type { CourseProgress, Progress } from "../types";
 import { useLoad } from "../useLoad";
@@ -132,7 +132,7 @@ function CourseCard({ course }: { course: CourseProgress }) {
       </Notice>
       <WeekHands course={course} />
       <DailyChart course={course} />
-      <h3>Επίπεδο βοήθειας σε κάθε ενότητα</h3>
+      <h3>Τρόπος μελέτης σε κάθε ενότητα</h3>
       {course.chapters.map((ch) => (
         <div key={ch.title} className="chapter-levels">
           <p className="chapter-title">{ch.title}</p>
@@ -148,12 +148,12 @@ function CourseCard({ course }: { course: CourseProgress }) {
       ))}
       {course.level_history.length > 0 && (
         <>
-          <h3>Αλλαγές επιπέδου</h3>
+          <h3>Αλλαγές στον τρόπο μελέτης</h3>
           <ul className="history">
             {course.level_history.map((h) => (
               <li key={`${h.at}-${h.section}`}>
                 <CircleCheck aria-hidden="true" />
-                {dayFmt.format(new Date(h.at))}, {h.section}: από επίπεδο {h.from_level} σε επίπεδο {h.to_level}
+                {dayFmt.format(new Date(h.at))}, {h.section}: από «{LEVELS[h.from_level].name}» σε «{LEVELS[h.to_level].name}»
               </li>
             ))}
           </ul>
@@ -180,8 +180,8 @@ function ProgressBody({ data, impersonal = false }: { data: Progress; impersonal
       <p className="lead">{data.message}</p>
       <p>
         {impersonal
-          ? "Ένα χεράκι = μία υπόδειξη ανά ερώτηση. Λιγότερα χεράκια σημαίνουν λιγότερη βοήθεια."
-          : "Ένα χεράκι = μία υπόδειξη ανά ερώτηση. Λιγότερα χεράκια σημαίνουν ότι τα καταφέρνεις με λιγότερη βοήθεια."}
+          ? "Κάθε εικονίδιο χεριού = μία υπόδειξη ανά ερώτηση. Λιγότερα εικονίδια σημαίνουν λιγότερη βοήθεια."
+          : "Κάθε εικονίδιο χεριού = μία υπόδειξη ανά ερώτηση. Λιγότερα εικονίδια σημαίνουν ότι χρειάζεσαι λιγότερη βοήθεια."}
       </p>
       {data.milestones.length > 0 && (
         <section className="panel" aria-labelledby="milestones-title">
