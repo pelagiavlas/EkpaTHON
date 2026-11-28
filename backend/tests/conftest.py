@@ -25,3 +25,14 @@ def client(engine, tmp_path, monkeypatch):
     app.dependency_overrides[get_session] = override
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def rules_engine(monkeypatch):
+    """Use the simple fallback rules of [fading] instead of BKT."""
+    from dataclasses import replace
+
+    from app.config import load_config
+
+    config = replace(load_config(), engine="rules")
+    monkeypatch.setattr("app.learning.service.load_config", lambda: config)

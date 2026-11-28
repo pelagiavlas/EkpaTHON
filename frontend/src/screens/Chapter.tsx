@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ChevronRight } from "lucide-react";
+import { BookOpen, ChevronRight, CircleCheck } from "lucide-react";
 import { Screen } from "../components/Screen";
 import { LevelSteps, Loading, Notice } from "../components/common";
 import type { Chapter } from "../types";
@@ -18,13 +18,18 @@ export function ChapterScreen() {
     <Screen
       title={chapter?.title ?? "Κεφάλαιο"}
       back={chapter ? `/courses/${chapter.course_id}` : "/"}
-      listen={chapter ? [{ text: `${chapter.title}. Έχει ${chapter.sections.length} ενότητες.` }] : undefined}
+      listen={chapter ? [{ text: `${chapter.title}. Έχει ${chapter.sections.length} ενότητες.${chapter.concepts_known ? ` Ξέρεις ήδη ${chapter.concepts_known} από τις ${chapter.concepts_total} έννοιες αυτού του κεφαλαίου.` : ""}` }] : undefined}
     >
       {error && <Notice tone="error" live>{error}</Notice>}
       {!chapter && !error && <Loading />}
       {chapter && (
         <>
           <p>Το κεφάλαιο έχει {chapter.sections.length} μικρές ενότητες. Κάθε ενότητα έχει τον δικό της τρόπο μελέτης.</p>
+          {chapter.concepts_known > 0 && (
+            <Notice tone="success" icon={CircleCheck}>
+              <p>Ξέρεις ήδη {chapter.concepts_known} από τις {chapter.concepts_total} έννοιες αυτού του κεφαλαίου.</p>
+            </Notice>
+          )}
           <ol className="cards">
             {chapter.sections.map((s, i) => (
               <li key={s.id}>

@@ -1,18 +1,21 @@
 """Glue between the learning rules and the database. Support levels live per section."""
 
+import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 from sqlmodel import Session, select
 
 from app.config import load_config
-from app.content.mock import normalize_title
+from app.learning import bkt
 from app.learning.fading import (
     LEVEL_NAMES, MAX_LEVEL, MIN_LEVEL, PROPOSAL_MESSAGES, SEARCH_FROM_LEVEL, Outcome, easy_text_proposal, propose,
 )
-from app.models import Attempt, Course, Document, LevelChange, Milestone, Section, SectionSupport, Visit
+from app.models import (
+    Attempt, ConceptMastery, Course, Document, LevelChange, Milestone, Section, SectionSupport, Visit,
+)
 from app.schemas import (
-    ChapterLevels, CourseProgress, DayPoint, LevelStep, MilestoneOut, ProposalOut, SectionLevel, SupportOut, WeekPoint,
+    ChapterLevels, ConceptOut, CourseProgress, DayPoint, LevelStep, MilestoneOut, ProposalOut, SectionLevel, SupportOut, WeekPoint,
 )
 
 MILESTONES = {
@@ -64,24 +67,87 @@ def _propose(sup: SectionSupport, to_level: int, reason: str) -> None:
     sup.proposal_reason = reason
 
 
-def update_proposal(session: Session, section_id: int) -> SectionSupport:
-    """After a finished answer: apply the fading rules to THIS section's answers."""
-    fading, _ = load_config()
+# --- knowledge tracing (BKT) per concept ----------------------------------------
+
+def mastery(session: Session, course_id: int, concept: str, create: bool = True) -> ConceptMastery | None:
+    row = session.exec(
+        select(ConceptMastery).where(ConceptMastery.course_id == course_id, ConceptMastery.concept == concept)
+    ).first()
+    if row is None and create:
+        row = ConceptMastery(course_id=course_id, concept=concept, p_known=load_config().bkt.p_init)
+        session.add(row)
+        session.flush()
+    return row
+
+
+def record_evidence(session: Session, attempt: Attempt) -> None:
+    """Update the concept's P(known) after a finished attempt (standard BKT)."""
+    if attempt.concept is None or attempt.mode == "keypoints" or attempt.correct is None:
+        return
+    cfg = load_config().bkt
+    ev = bkt.evidence(bool(attempt.correct), attempt.wrong_tries, help_used(attempt), attempt.self_checked,
+                      attempt.shown_options, cfg)
+    if ev is None:  # self-check: the student judged it, not evidence of knowledge
+        return
+    row = mastery(session, attempt.course_id, attempt.concept)
+    row.p_known = bkt.update(row.p_known, ev.correct, ev.guess, cfg)
+    row.observations += 1
+    row.updated_at = datetime.now()
+    session.add(row)
+
+
+def section_concepts(section: Section) -> list[str]:
+    return json.loads(section.concepts_json or "[]")
+
+
+def _bkt_direction(session: Session, sup: SectionSupport, section: Section, course_id: int,
+                   concept: str | None) -> str | None:
+    """All concepts of the section above the threshold -> up. The concept being worked on
+    below the low threshold (after enough answers) -> down."""
+    cfg = load_config().bkt
+    concepts = section_concepts(section)
+    if not concepts:
+        return None
+    rows = {c: mastery(session, course_id, c, create=False) for c in concepts}
+    if sup.level < MAX_LEVEL and all(r is not None and r.p_known > cfg.up_threshold for r in rows.values()):
+        return "up"
+    current = rows.get(concept) if concept else None
+    if concept and current is None:
+        current = mastery(session, course_id, concept, create=False)
+    low = current is not None and current.observations >= cfg.min_observations and current.p_known < cfg.down_threshold
+    if sup.level > MIN_LEVEL and low:
+        return "down"
+    return None
+
+
+def update_proposal(session: Session, section_id: int, concept: str | None = None) -> SectionSupport:
+    """After a finished answer: propose (never apply) a change for THIS section.
+    engine = "bkt": knowledge per concept. engine = "rules": the simple rules of [fading]."""
+    config = load_config()
     sup = support(session, section_id)
     attempts = session.exec(
         select(Attempt).where(
-            Attempt.section_id == section_id, Attempt.correct != None, Attempt.mode != "exam",  # noqa: E711
+            Attempt.section_id == section_id, Attempt.correct != None, Attempt.mode == "question",  # noqa: E711
             Attempt.finished_at >= sup.window_start,
         ).order_by(Attempt.finished_at)
     ).all()
-    outcomes = [
-        Outcome(a.hints_used, bool(a.correct), a.wrong_tries, search=a.level >= SEARCH_FROM_LEVEL, fell_back=a.fell_back)
-        for a in attempts
-    ]
-    direction = propose(sup.level, outcomes, fading)
+    if config.engine == "bkt":
+        section = session.get(Section, section_id)
+        course_id = session.get(Document, section.document_id).course_id
+        # After a decision ("yes" or "not now"), wait for a few new answers before proposing again.
+        enough = len(attempts) >= config.bkt.min_observations
+        direction = _bkt_direction(session, sup, section, course_id, concept) if enough else None
+        reasons = {"up": "known_up", "down": "concept_down"}
+    else:
+        outcomes = [
+            Outcome(a.hints_used, bool(a.correct), a.wrong_tries, search=a.level >= SEARCH_FROM_LEVEL, fell_back=a.fell_back)
+            for a in attempts
+        ]
+        direction = propose(sup.level, outcomes, config.fading)
+        reasons = {"up": "fading_up", "down": "fading_down"}
     if direction:
-        _propose(sup, sup.level + (1 if direction == "up" else -1), f"fading_{direction}")
-    elif sup.proposal_reason in ("fading_up", "fading_down"):
+        _propose(sup, sup.level + (1 if direction == "up" else -1), reasons[direction])
+    elif sup.proposal_reason in ("fading_up", "fading_down", "known_up", "concept_down"):
         sup.proposal_to = sup.proposal_reason = None
     session.add(sup)
     return sup
@@ -89,7 +155,7 @@ def update_proposal(session: Session, section_id: int) -> SectionSupport:
 
 def check_easy_use(session: Session, section_id: int) -> SectionSupport:
     """Levels 3-4: the Easy-to-Read text is used often -> offer one level back."""
-    fading, _ = load_config()
+    fading = load_config().fading
     sup = support(session, section_id)
     visits = session.exec(
         select(Visit).where(Visit.section_id == section_id, Visit.level == sup.level, Visit.created_at >= sup.window_start)
@@ -101,23 +167,40 @@ def check_easy_use(session: Session, section_id: int) -> SectionSupport:
     return sup
 
 
-def propose_same_topic(session: Session, section: Section, course_id: int) -> None:
-    """A section on a topic the student already studied (same title, same course):
-    OFFER the level reached there. Never applied without a yes."""
-    title = normalize_title(section.title)
-    best = 1
-    others = session.exec(
-        select(Section, SectionSupport).join(Document, Document.id == Section.document_id)
-        .join(SectionSupport, SectionSupport.section_id == Section.id)
-        .where(Document.course_id == course_id, Section.id != section.id)
-    ).all()
-    for other, sup in others:
-        if normalize_title(other.title) == title:
-            best = max(best, sup.level)
-    if best > 1:
-        sup = support(session, section.id)
-        _propose(sup, best, "same_topic")
-        session.add(sup)
+def propose_known_concepts(session: Session, section: Section, course_id: int) -> None:
+    """New section whose concepts the student already knows (from earlier chapters):
+    OFFER less support, never apply it. Offered level = the lowest of the highest levels
+    at which each concept was practised (at least one step up)."""
+    cfg = load_config().bkt
+    concepts = section_concepts(section)
+    if not concepts:
+        return
+    rows = [mastery(session, course_id, c, create=False) for c in concepts]
+    if not all(r is not None and r.p_known > cfg.up_threshold for r in rows):
+        return
+    reached = []
+    for c in concepts:
+        levels = session.exec(select(Attempt.level).where(Attempt.course_id == course_id, Attempt.concept == c)).all()
+        reached.append(max(levels, default=1))
+    sup = support(session, section.id)
+    _propose(sup, max(2, min(reached)), "known_start")
+    session.add(sup)
+
+
+def concept_summary(session: Session, course_id: int, concepts: list[str]) -> tuple[int, int]:
+    """(known, total) for "Ξέρεις ήδη 3 από τις 5 έννοιες"."""
+    cfg = load_config().bkt
+    unique = list(dict.fromkeys(concepts))
+    known = 0
+    for c in unique:
+        row = mastery(session, course_id, c, create=False)
+        known += row is not None and row.p_known >= cfg.label_known
+    return known, len(unique)
+
+
+def concept_out(row: ConceptMastery) -> ConceptOut:
+    key = bkt.label_key(row.p_known, load_config().bkt)
+    return ConceptOut(concept=row.concept, label_key=key, label=bkt.LABELS[key])
 
 
 def set_level(session: Session, section_id: int, level: int, reason: str) -> list[MilestoneOut]:
@@ -267,6 +350,10 @@ def course_progress(session: Session, course: Course, today: date, impersonal: b
             for c, s in changes
         ],
         message=progress_message(weeks[0].hints_per_question, weeks[1].hints_per_question, weeks[1].questions, impersonal),
+        concepts=[concept_out(r) for r in session.exec(
+            select(ConceptMastery).where(ConceptMastery.course_id == course.id, ConceptMastery.observations > 0)
+            .order_by(ConceptMastery.concept)
+        )],
     )
 
 

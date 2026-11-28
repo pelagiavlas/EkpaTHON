@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import {
-  Book, Brain, Calculator, ChartColumn, Code, FlaskConical, Globe, Info, Scale, type LucideIcon,
+  Book, Brain, Calculator, ChartColumn, CircleCheck, CircleDashed, CircleDot, Code, FlaskConical, Globe, Info, Scale,
+  type LucideIcon,
 } from "lucide-react";
+import type { Concept } from "../types";
 
 export const COURSE_ICONS: Record<string, { icon: LucideIcon; label: string }> = {
   chart: { icon: ChartColumn, label: "Γράφημα" },
@@ -89,5 +91,26 @@ export function Loading({ text = "Φορτώνει..." }: { text?: string }) {
     <p className="loading" role="status">
       {text}
     </p>
+  );
+}
+
+const CONCEPT_ICONS = { learning: CircleDashed, almost: CircleDot, known: CircleCheck };
+
+/** Each concept with words and an icon: "Το μαθαίνεις", "Σχεδόν το ξέρεις", "Το ξέρεις". Never a percentage. */
+export function ConceptList({ concepts }: { concepts: Concept[] }) {
+  if (!concepts.length) return null;
+  return (
+    <ul className="concepts">
+      {concepts.map((c) => {
+        const Icon = CONCEPT_ICONS[c.label_key];
+        return (
+          <li key={c.concept} className={`concept concept-${c.label_key}`}>
+            <Icon aria-hidden="true" />
+            <span className="concept-name">{c.concept}</span>
+            <span className="concept-label">{c.label}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

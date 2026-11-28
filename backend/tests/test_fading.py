@@ -74,6 +74,7 @@ def test_numbers_come_from_config():
 
 
 def test_config_file_loads():
-    fading, search = load_config()
-    assert fading.up_after_successes == 3 and fading.easy_window == 3
-    assert search.max_wrong_picks == 3
+    config = load_config()
+    assert config.fading.up_after_successes == 3 and config.fading.easy_window == 3
+    assert config.search.max_wrong_picks == 3
+    assert config.engine == "bkt"

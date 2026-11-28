@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 330" role="img" aria-labelledby="t d" font-family="Segoe UI, Arial, sans-serif">
+<title id="t">Προτάσεις για λιγότερη υποστήριξη ΠΡΙΝ ο φοιτητής μάθει τις έννοιες</title>
+<desc id="d">Ερωτήσεις 2 επιλογών, BKT: 0,5%; Ερωτήσεις 2 επιλογών, Απλοί κανόνες: 55,0%; Ερωτήσεις 3 επιλογών, BKT: 1,0%; Ερωτήσεις 3 επιλογών, Απλοί κανόνες: 42,5%; Ανοιχτές ερωτήσεις, BKT: 2,0%; Ανοιχτές ερωτήσεις, Απλοί κανόνες: 10,5%</desc>
+<rect width="720" height="330" fill="#ffffff"/>
+<text x="64" y="26" font-size="17" font-weight="700" fill="#111418">Πρόωρες προτάσεις για λιγότερη υποστήριξη (% των 200 φοιτητών)</text>
+<line x1="64" x2="696" y1="260.0" y2="260.0" stroke="#d5d9e0" stroke-width="1"/>
+<text x="56" y="264.0" font-size="12" text-anchor="end" fill="#3b4350">0%</text>
+<line x1="64" x2="696" y1="227.7" y2="227.7" stroke="#d5d9e0" stroke-width="1"/>
+<text x="56" y="231.7" font-size="12" text-anchor="end" fill="#3b4350">10%</text>
+<line x1="64" x2="696" y1="195.5" y2="195.5" stroke="#d5d9e0" stroke-width="1"/>
+<text x="56" y="199.5" font-size="12" text-anchor="end" fill="#3b4350">20%</text>
+<line x1="64" x2="696" y1="163.2" y2="163.2" stroke="#d5d9e0" stroke-width="1"/>
+<text x="56" y="167.2" font-size="12" text-anchor="end" fill="#3b4350">30%</text>
+<line x1="64" x2="696" y1="131.0" y2="131.0" stroke="#d5d9e0" stroke-width="1"/>
+<text x="56" y="135.0" font-size="12" text-anchor="end" fill="#3b4350">40%</text>
+<line x1="64" x2="696" y1="98.7" y2="98.7" stroke="#d5d9e0" stroke-width="1"/>
+<text x="56" y="102.7" font-size="12" text-anchor="end" fill="#3b4350">50%</text>
+<line x1="64" x2="696" y1="66.5" y2="66.5" stroke="#d5d9e0" stroke-width="1"/>
+<text x="56" y="70.5" font-size="12" text-anchor="end" fill="#3b4350">60%</text>
+<path d="M111.3,260 v2.0 q0,-4 4,-4 h48.0 q4,0 4,4 v-2.0 z" fill="#2a63c4"/>
+<text x="139.3" y="252.0" font-size="12" font-weight="700" text-anchor="middle" fill="#111418">0,5%</text>
+<path d="M171.3,260 v-173.4 q0,-4 4,-4 h48.0 q4,0 4,4 v173.4 z" fill="#c2571a"/>
+<text x="199.3" y="76.6" font-size="12" font-weight="700" text-anchor="middle" fill="#111418">55,0%</text>
+<text x="169.3" y="282" font-size="13" text-anchor="middle" fill="#111418">Ερωτήσεις 2 επιλογών</text>
+<path d="M322.0,260 v0.8 q0,-4 4,-4 h48.0 q4,0 4,4 v-0.8 z" fill="#2a63c4"/>
+<text x="350.0" y="250.8" font-size="12" font-weight="700" text-anchor="middle" fill="#111418">1,0%</text>
+<path d="M382.0,260 v-133.1 q0,-4 4,-4 h48.0 q4,0 4,4 v133.1 z" fill="#c2571a"/>
+<text x="410.0" y="116.9" font-size="12" font-weight="700" text-anchor="middle" fill="#111418">42,5%</text>
+<text x="380.0" y="282" font-size="13" text-anchor="middle" fill="#111418">Ερωτήσεις 3 επιλογών</text>
+<path d="M532.7,260 v-2.5 q0,-4 4,-4 h48.0 q4,0 4,4 v2.5 z" fill="#2a63c4"/>
+<text x="560.7" y="247.5" font-size="12" font-weight="700" text-anchor="middle" fill="#111418">2,0%</text>
+<path d="M592.7,260 v-29.9 q0,-4 4,-4 h48.0 q4,0 4,4 v29.9 z" fill="#c2571a"/>
+<text x="620.7" y="220.1" font-size="12" font-weight="700" text-anchor="middle" fill="#111418">10,5%</text>
+<text x="590.7" y="282" font-size="13" text-anchor="middle" fill="#111418">Ανοιχτές ερωτήσεις</text>
+<rect x="64" y="304" width="14" height="14" rx="3" fill="#2a63c4"/>
+<text x="84" y="316" font-size="13" fill="#111418">BKT</text>
+<rect x="214" y="304" width="14" height="14" rx="3" fill="#c2571a"/>
+<text x="234" y="316" font-size="13" fill="#111418">Απλοί κανόνες</text>
+</svg>

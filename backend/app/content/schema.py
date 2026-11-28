@@ -62,6 +62,7 @@ class Hint(BaseModel):
 
 class QuestionContent(BaseModel):
     key: str  # stable id inside the section
+    concept: str | None = None  # the idea the question checks, e.g. "μέγεθος δείγματος" (knowledge tracing)
     section_number: str | None = None
     prompt: str
     image: str | None = None

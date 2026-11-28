@@ -125,6 +125,7 @@ def make_questions(section: SectionInput, level: int) -> list[QuestionContent]:
         distractors = rng.sample(others, 2)
         questions.append(QuestionContent(
             key=f"rule-{len(questions) + 1}",
+            concept=entry["term"],
             section_number=section.number,
             prompt=f"Ποια λέξη λείπει από την πρόταση; «{blanked}»",
             options=[Option(text=shown), Option(text=distractors[0]), Option(text=distractors[1])],

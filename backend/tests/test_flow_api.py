@@ -3,6 +3,9 @@
 import json
 
 import pytest
+from sqlmodel import Session, select
+
+from app.models import ConceptMastery
 
 from scripts.make_demo_pdf import CHAPTER
 from scripts.pdfgen import build_pdf
@@ -53,16 +56,21 @@ def test_first_use_has_no_question_before_studying(client):
     assert settings["onboarded"] is False and settings["readAloud"] is True  # defaults, nothing asked
 
 
-def test_same_topic_is_offered_never_applied(setup):
-    client, course, _, sections = setup
-    set_level(client, sections["3.2"], 3)
-    again = build_pdf([("h1", "4 Επανάληψη"), ("p", "Κείμενο."), ("h2", "Η έννοια του διαστήματος εμπιστοσύνης"),
-                       ("p", "Το διάστημα εμπιστοσύνης είναι ένα εύρος τιμών.")])
-    doc = client.post(f"/api/courses/{course['id']}/documents", files={"file": ("k4.pdf", again, "application/pdf")}).json()
-    repeated = next(s for s in doc["sections"] if s["title"] == "Η έννοια του διαστήματος εμπιστοσύνης")
-    support = client.get(f"/api/sections/{repeated['id']}/support").json()
-    assert support["level"] == 1  # nothing changed by itself
-    assert support["proposal"]["reason"] == "same_topic" and support["proposal"]["to_level"] == 3
+def test_known_concepts_are_offered_never_applied(client, engine):
+    """A new chapter whose concepts are already known: a proposal with an explanation, no change."""
+    course = client.post("/api/courses", json={"name": "Στατιστική", "icon": "chart"}).json()
+    with Session(engine) as s:
+        for concept in ("διάστημα εμπιστοσύνης", "επίπεδο εμπιστοσύνης"):
+            s.add(ConceptMastery(course_id=course["id"], concept=concept, p_known=0.97, observations=6))
+        s.commit()
+    doc = client.post(f"/api/courses/{course['id']}/documents", files={"file": ("k3.pdf", PDF, "application/pdf")}).json()
+    sections = {s["number"]: s for s in doc["sections"]}
+    assert {s["level"] for s in doc["sections"]} == {1}  # nothing applied silently
+    support = client.get(f"/api/sections/{sections['3.2']['id']}/support").json()
+    assert support["proposal"]["reason"] == "known_start" and support["proposal"]["to_level"] == 2
+    assert "Ξέρεις ήδη" in support["proposal"]["message"]
+    assert not sections["3.4"]["has_proposal"]  # 3.4 also needs "μέγεθος δείγματος", not known yet
+    assert (doc["concepts_known"], doc["concepts_total"]) == (2, 6)
 
 
 # --- study ---------------------------------------------------------------------------
@@ -207,7 +215,7 @@ def test_pick_needs_step_3(setup):
 
 # --- fading per section, always with a yes -----------------------------------------------
 
-def test_fading_is_per_section(setup):
+def test_fading_is_per_section(setup, rules_engine):
     client, _, _, sections = setup
     answer_right(client, sections["3.1"], 0)
     answer_right(client, sections["3.1"], 1)
@@ -218,7 +226,7 @@ def test_fading_is_per_section(setup):
     assert client.get(f"/api/sections/{sections['3.2']}/support").json()["proposal"] is None
 
 
-def test_no_level_change_without_a_yes(setup):
+def test_no_level_change_without_a_yes(setup, rules_engine):
     client, _, _, sections = setup
     for i in (0, 1, 0):
         answer_right(client, sections["3.1"], i)
@@ -227,7 +235,7 @@ def test_no_level_change_without_a_yes(setup):
     assert after["level"] == 2 and after["proposal"] is None
 
 
-def test_declining_starts_counting_again(setup):
+def test_declining_starts_counting_again(setup, rules_engine):
     client, _, _, sections = setup
     for i in (0, 1, 0):
         answer_right(client, sections["3.1"], i)
@@ -329,3 +337,61 @@ def test_strategy_question_at_level_3(setup):
     client.post(f"/api/courses/{course['id']}/strategy", json={"choice": "example"})
     last = client.get(f"/api/sections/{sections['3.4']}/questions").json()["last_strategy"]
     assert last == {"choice": "example", "label": "Το παράδειγμα"}
+
+
+# --- knowledge tracing (BKT) -----------------------------------------------------------
+
+def known(engine, concept):
+    with Session(engine) as s:
+        return s.exec(select(ConceptMastery).where(ConceptMastery.concept == concept)).first()
+
+
+def test_bkt_updates_after_each_answer(setup, engine):
+    client, _, _, sections = setup
+    answer_right(client, sections["3.4"], 0)  # q7, two choices, no help
+    row = known(engine, "μέγεθος δείγματος")
+    assert row.observations == 1 and round(row.p_known, 2) == 0.52
+
+
+def test_self_checked_answers_do_not_update_bkt(setup, engine):
+    client, _, _, sections = setup
+    set_level(client, sections["3.4"], 3)
+    _, _, attempt = start(client, sections["3.4"])
+    client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν είμαι σίγουρος"})
+    client.post(f"/api/attempts/{attempt}/self-check", json={"close": True})
+    row = known(engine, "μέγεθος δείγματος")
+    assert row is None or row.observations == 0
+
+
+def test_bkt_proposes_less_support_when_every_concept_is_known(setup):
+    client, _, _, sections = setup
+    set_level(client, sections["3.4"], 3)
+    _, _, a = start(client, sections["3.4"], 0)
+    first = client.post(f"/api/attempts/{a}/answer", json={"text": "μικραίνει"}).json()
+    assert first["proposal"] is None  # one concept of two
+    _, _, b = start(client, sections["3.4"], 1)
+    second = client.post(f"/api/attempts/{b}/answer", json={"text": "μεγαλώνει"}).json()
+    assert second["proposal"]["reason"] == "known_up" and second["proposal"]["to_level"] == 4
+    assert client.get(f"/api/sections/{sections['3.4']}/support").json()["level"] == 3  # still a proposal
+
+
+def test_bkt_proposes_more_support_only_after_enough_answers(setup):
+    client, _, _, sections = setup
+    set_level(client, sections["3.4"], 2)
+    results = []
+    for _ in range(2):
+        _, q, attempt = start(client, sections["3.4"], 0)
+        wrong = next(o for o in q["options"] if o["id"] != 0)
+        client.post(f"/api/attempts/{attempt}/answer", json={"option_id": wrong["id"]})
+        results.append(client.post(f"/api/attempts/{attempt}/explain").json())
+    assert results[0]["proposal"] is None  # one answer is not enough
+    assert results[1]["proposal"]["reason"] == "concept_down" and results[1]["proposal"]["to_level"] == 1
+
+
+def test_students_never_get_probabilities(setup):
+    client, _, _, sections = setup
+    answer_right(client, sections["3.4"], 0)
+    concepts = client.get(f"/api/sections/{sections['3.4']}/concepts").json()
+    assert concepts == [{"concept": "μέγεθος δείγματος", "label_key": "learning", "label": "Το μαθαίνεις"}]
+    progress = json.dumps(client.get("/api/progress").json())
+    assert "p_known" not in progress and "0.52" not in progress

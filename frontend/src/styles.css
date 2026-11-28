@@ -1200,3 +1200,50 @@ h3 > svg {
   height: 1.4em;
   flex: none;
 }
+
+/* ---- concepts: words and an icon, never a percentage ---- */
+
+.concepts {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.concept {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--border-soft);
+  border-radius: 10px;
+}
+.concept svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.concept-name {
+  font-weight: 700;
+}
+.concept-label {
+  font-weight: 600;
+}
+.concept-known {
+  border-color: var(--success);
+}
+.concept-known svg {
+  color: var(--success);
+}
+.concept-almost svg,
+.concept-learning svg {
+  color: var(--primary);
+}
+@media (max-width: 30rem) {
+  .concept {
+    grid-template-columns: auto 1fr;
+  }
+  .concept-label {
+    grid-column: 2;
+  }
+}

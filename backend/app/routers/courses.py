@@ -9,9 +9,10 @@ from app.db import STORAGE_DIR, get_session
 from app.learning import service
 from app.learning.fading import LEVEL_NAMES
 from app.models import (
-    Attempt, ContentCache, Course, Document, LevelChange, Milestone, Question, Section, SectionNote, SectionSupport,
-    StrategyNote, Visit,
+    Attempt, ConceptMastery, ContentCache, Course, Document, LevelChange, Milestone, Question, Section, SectionNote,
+    SectionSupport, StrategyNote, Visit,
 )
+from app.content import SectionInput, get_provider
 from app.pdf import PdfError, pdf_to_sections
 from app.schemas import CourseIn, CourseOut, DocumentOut, SectionSummary, StrategyIn
 
@@ -48,9 +49,21 @@ def document_out(session: Session, doc: Document) -> DocumentOut:
             id=s.id, number=s.number, title=s.title, level=sup.level, level_name=LEVEL_NAMES[sup.level],
             has_proposal=service.proposal_out(sup) is not None,
         ))
+    concepts = [c for s in session.exec(select(Section).where(Section.document_id == doc.id)) for c in service.section_concepts(s)]
+    known, total = service.concept_summary(session, doc.course_id, concepts)
     return DocumentOut(
         **doc.model_dump(include={"id", "course_id", "title", "filename", "uploaded_at"}), sections=summaries,
+        concepts_known=known, concepts_total=total,
     )
+
+
+def concepts_of(number: str | None, title: str, paragraphs: list[str]) -> list[str]:
+    """The concepts the section's questions check (from the content provider)."""
+    try:
+        questions = get_provider().make_questions(SectionInput(number, title, paragraphs), 1)
+    except NotImplementedError:
+        return []
+    return list(dict.fromkeys(q.concept for q in questions if q.concept))
 
 
 @router.get("/courses", response_model=list[CourseOut])
@@ -77,7 +90,7 @@ def delete_course(course_id: int, session: Session = Depends(get_session)):
     course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
     for doc in session.exec(select(Document).where(Document.course_id == course_id)):
         _delete_document(session, doc)
-    for model in (Attempt, StrategyNote):
+    for model in (Attempt, StrategyNote, ConceptMastery):
         session.exec(delete(model).where(model.course_id == course_id))
     session.delete(course)
     session.commit()
@@ -112,7 +125,7 @@ def chapter_title(sections, filename: str) -> str:
 @router.post("/courses/{course_id}/documents", response_model=DocumentOut, status_code=201)
 async def upload_document(course_id: int, file: UploadFile, session: Session = Depends(get_session)):
     """Straight to the sections: every new section starts at level 1, no placement question.
-    A section on a topic already studied in this course gets a PROPOSAL, never a silent change."""
+    A section whose concepts the student already knows gets a PROPOSAL, never a silent change."""
     course = get_or_404(session, Course, course_id, "Δεν βρέθηκε το μάθημα")
     data = await file.read(MAX_PDF_BYTES + 1)
     if len(data) > MAX_PDF_BYTES:
@@ -138,12 +151,13 @@ async def upload_document(course_id: int, file: UploadFile, session: Session = D
             row = Section(
                 document_id=doc.id, position=position, number=s.number, title=s.title,
                 paragraphs_json=json.dumps(s.paragraphs, ensure_ascii=False),
+                concepts_json=json.dumps(concepts_of(s.number, s.title, s.paragraphs), ensure_ascii=False),
             )
             session.add(row)
             session.flush()
             session.add(SectionSupport(section_id=row.id))
             session.flush()
-            service.propose_same_topic(session, row, course.id)
+            service.propose_known_concepts(session, row, course.id)
     session.commit()
     session.refresh(doc)
     return document_out(session, doc)

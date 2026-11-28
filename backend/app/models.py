@@ -42,6 +42,7 @@ class Section(SQLModel, table=True):
     number: str | None = None  # "3.2" when the heading is numbered
     title: str
     paragraphs_json: str  # original text, one entry per paragraph
+    concepts_json: str = "[]"  # concepts its questions check (for "Ξέρεις ήδη 3 από τις 5 έννοιες")
 
 
 class SectionSupport(SQLModel, table=True):
@@ -80,6 +81,8 @@ class Attempt(SQLModel, table=True):
     document_id: int | None = Field(default=None, foreign_key="document.id")
     level: int
     mode: str = "question"  # question | keypoints | exam (exam never changes the level)
+    concept: str | None = None  # the concept the question checks (for knowledge tracing)
+    shown_options: int = 0  # 2 or 3 choices, 0 = open question (sets the BKT guess chance)
     hints_used: int = 0  # hints that explain (0-4)
     search_steps: int = 0  # levels 3-4: hints that point into the original (0-3)
     wrong_picks: int = 0
@@ -93,6 +96,19 @@ class Attempt(SQLModel, table=True):
     listened: bool = False
     started_at: datetime = Field(default_factory=datetime.now)
     finished_at: datetime | None = None
+    simulated: bool = False
+
+
+class ConceptMastery(SQLModel, table=True):
+    """Bayesian Knowledge Tracing: estimated probability that a concept is known, per course.
+    Internal only: the student sees words ("Το μαθαίνεις", ...), never this number."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    course_id: int = Field(foreign_key="course.id", index=True)
+    concept: str = Field(index=True)
+    p_known: float
+    observations: int = 0
+    updated_at: datetime = Field(default_factory=datetime.now)
     simulated: bool = False
 
 

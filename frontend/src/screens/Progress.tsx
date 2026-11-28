@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { CircleCheck, Flag, Hand, Info, TrendingDown } from "lucide-react";
 import { Screen } from "../components/Screen";
-import { CourseIcon, LEVELS, LevelSteps, Loading, Notice } from "../components/common";
+import { ConceptList, CourseIcon, LEVELS, LevelSteps, Loading, Notice } from "../components/common";
 import { useSettings } from "../settings";
 import type { CourseProgress, Progress } from "../types";
 import { useLoad } from "../useLoad";
@@ -132,6 +132,12 @@ function CourseCard({ course }: { course: CourseProgress }) {
       </Notice>
       <WeekHands course={course} />
       <DailyChart course={course} />
+      {course.concepts.length > 0 && (
+        <>
+          <h3>Έννοιες</h3>
+          <ConceptList concepts={course.concepts} />
+        </>
+      )}
       <h3>Τρόπος μελέτης σε κάθε ενότητα</h3>
       {course.chapters.map((ch) => (
         <div key={ch.title} className="chapter-levels">

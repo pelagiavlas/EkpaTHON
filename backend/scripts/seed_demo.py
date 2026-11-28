@@ -5,8 +5,9 @@ Story (support level per SECTION):
   sections climb 1 -> 2 -> 3, every change accepted by the student.
 - Chapter 2 already covered two topics that come back in the demo PDF (chapter 3):
   "Σημειακή εκτίμηση και δειγματοληπτικό σφάλμα" and "Η έννοια του διαστήματος εμπιστοσύνης".
-  After the live upload, 3.1 and 3.2 get a PROPOSAL for level 3 ("same topic"),
-  3.3 and 3.4 start at level 1. So the presentation can show both kinds of help.
+  Knowledge tracing (BKT) knows those concepts, so after the live upload 3.1 and 3.2 get a
+  PROPOSAL ("you already know these concepts"), 3.3 and 3.4 start at level 1.
+  So the presentation can show both kinds of help.
 - A second course stays at level 1.
 
 Run from backend/:
@@ -15,25 +16,31 @@ Run from backend/:
 """
 
 import argparse
+import json
 import sys
 from datetime import datetime, time, timedelta
 
 from sqlmodel import Session, SQLModel, select
 
 from app.db import engine, init_db
+from app.learning import service
 from app.models import (
-    Attempt, Course, Document, LevelChange, Milestone, Profile, Section, SectionSupport, StrategyNote,
+    Attempt, ConceptMastery, Course, Document, LevelChange, Milestone, Profile, Section, SectionSupport, StrategyNote,
 )
 from app.schemas import Settings
 from scripts.make_demo_pdf import main as make_demo_pdf
 
 QUESTIONS_PER_DAY = 6
 
+# (number, title, concepts its questions check)
 STATISTICS = {
-    "Κεφάλαιο 1: Περιγραφική στατιστική": [("1.1", "Μέση τιμή και διάμεσος"), ("1.2", "Διασπορά και τυπική απόκλιση")],
+    "Κεφάλαιο 1: Περιγραφική στατιστική": [
+        ("1.1", "Μέση τιμή και διάμεσος", ["μέση τιμή", "διάμεσος"]),
+        ("1.2", "Διασπορά και τυπική απόκλιση", ["διασπορά", "τυπική απόκλιση"]),
+    ],
     "Κεφάλαιο 2: Δειγματοληψία": [
-        ("2.1", "Σημειακή εκτίμηση και δειγματοληπτικό σφάλμα"),
-        ("2.2", "Η έννοια του διαστήματος εμπιστοσύνης"),
+        ("2.1", "Σημειακή εκτίμηση και δειγματοληπτικό σφάλμα", ["δείγμα", "δειγματοληπτικό σφάλμα"]),
+        ("2.2", "Η έννοια του διαστήματος εμπιστοσύνης", ["διάστημα εμπιστοσύνης", "επίπεδο εμπιστοσύνης"]),
     ],
 }
 # (days ago, section, level that day, mean help per question, wrong answers that day)
@@ -41,13 +48,17 @@ STATISTICS_DAYS = [
     (13, "1.1", 1, 2.8, 2), (12, "1.2", 1, 2.6, 2), (10, "1.1", 1, 2.0, 1),
     (9, "1.2", 1, 1.8, 1), (8, "1.1", 2, 1.4, 1),
     (6, "2.1", 1, 1.2, 1), (5, "2.2", 1, 1.0, 0), (4, "2.1", 2, 0.6, 0),
-    (3, "2.2", 2, 0.5, 0), (1, "2.1", 3, 0.4, 0),
+    (3, "2.2", 2, 0.5, 0), (2, "2.2", 3, 0.3, 0), (1, "2.1", 3, 0.4, 0),
 ]
 # (section, days ago, from, to): proposals the student accepted, in the evening of that day
 STATISTICS_LEVELS = [
     ("1.1", 10, 1, 2), ("1.2", 9, 1, 2), ("2.1", 6, 1, 2), ("2.2", 5, 1, 2), ("2.1", 4, 2, 3), ("2.2", 3, 2, 3),
 ]
-PSYCHOLOGY = {"Κεφάλαιο 1: Εισαγωγή": [("1.1", "Τι είναι η κοινωνική ψυχολογία"), ("1.2", "Στάσεις και συμπεριφορά")]}
+PSYCHOLOGY = {"Κεφάλαιο 1: Εισαγωγή": [
+    ("1.1", "Τι είναι η κοινωνική ψυχολογία", ["κοινωνική επιρροή", "ομάδα"]),
+    ("1.2", "Στάσεις και συμπεριφορά", ["στάση", "συμπεριφορά"]),
+]}
+OPTIONS_AT_LEVEL = {1: 2, 2: 3, 3: 0, 4: 0}  # level 1: two choices, 2: three, 3-4: open questions
 PSYCHOLOGY_DAYS = [(3, "1.1", 1, 2.6, 2), (1, "1.2", 1, 2.3, 1)]
 
 
@@ -67,8 +78,9 @@ def add_chapters(session: Session, course: Course, chapters: dict, uploaded_days
         doc = Document(course_id=course.id, filename="", title=title, simulated=True, uploaded_at=at(days_ago, 10))
         session.add(doc)
         session.flush()
-        for position, (number, name) in enumerate(parts):
-            section = Section(document_id=doc.id, position=position, number=number, title=name, paragraphs_json="[]")
+        for position, (number, name, concepts) in enumerate(parts):
+            section = Section(document_id=doc.id, position=position, number=number, title=name, paragraphs_json="[]",
+                              concepts_json=json.dumps(concepts, ensure_ascii=False))
             session.add(section)
             session.flush()
             session.add(SectionSupport(section_id=section.id, window_start=at(days_ago, 10)))
@@ -79,6 +91,7 @@ def add_chapters(session: Session, course: Course, chapters: dict, uploaded_days
 def add_days(session: Session, course: Course, sections: dict[str, Section], days: list) -> None:
     for days_ago, number, level, mean_help, wrong in days:
         section = sections[number]
+        concepts = json.loads(section.concepts_json)
         for i, help_count in enumerate(spread(round(mean_help * QUESTIONS_PER_DAY), QUESTIONS_PER_DAY)):
             start = at(days_ago, 17, i * 6)
             is_wrong = i >= QUESTIONS_PER_DAY - wrong
@@ -88,7 +101,19 @@ def add_days(session: Session, course: Course, sections: dict[str, Section], day
                 hints_used=0 if search else help_count, search_steps=help_count if search else 0,
                 found_sentence=search and help_count >= 3, wrong_tries=1 if is_wrong else 0, correct=not is_wrong,
                 started_at=start, finished_at=start + timedelta(minutes=4), simulated=True,
+                concept=concepts[i % len(concepts)], shown_options=OPTIONS_AT_LEVEL[level],
             ))
+
+
+def trace_knowledge(session: Session) -> None:
+    """Run the real BKT over the simulated answers, oldest first, so the demo's
+    'Το ξέρεις' labels come from the same model the app uses."""
+    session.flush()
+    for attempt in session.exec(select(Attempt).order_by(Attempt.finished_at)):
+        service.record_evidence(session, attempt)
+    for row in session.exec(select(ConceptMastery)):
+        row.simulated = True
+        session.add(row)
 
 
 def seed(session: Session) -> None:
@@ -117,6 +142,7 @@ def seed(session: Session) -> None:
     session.add(Milestone(key="first_level3", section_id=stats_sections["2.1"].id, seen=True,
                           created_at=at(4, 21), simulated=True))
     session.add(StrategyNote(course_id=stats.id, choice="example", created_at=at(1, 18)))
+    trace_knowledge(session)
     session.commit()
 
 

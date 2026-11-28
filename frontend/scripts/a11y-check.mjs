@@ -32,6 +32,9 @@ async function check(page, name, theme, device) {
   const text = await page.evaluate(() => document.body.innerText);
   const bad = text.match(/[Εε]πίπεδο\s*\d|χεράκ|Μαθαίνουμε/);
   if (bad) problems.push(`[${device}/${theme}] ${name}: «${bad[0]}» στο κείμενο`);
+  // Knowledge is shown in words only: no numbers or percentages next to concepts.
+  const concepts = await page.locator(".concepts").allInnerTexts();
+  if (concepts.some((c) => /\d/.test(c))) problems.push(`[${device}/${theme}] ${name}: αριθμός σε λίστα εννοιών`);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, `${device}-${theme}-${name}.png`), fullPage: true });
 }
 

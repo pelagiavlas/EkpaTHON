@@ -56,6 +56,15 @@ export interface Chapter {
   filename: string;
   uploaded_at: string;
   sections: SectionSummary[];
+  concepts_known: number;
+  concepts_total: number;
+}
+
+/** How well a concept is known, in words only (the probability stays on the server). */
+export interface Concept {
+  concept: string;
+  label_key: "learning" | "almost" | "known";
+  label: string;
 }
 
 export interface Block {
@@ -170,6 +179,7 @@ export interface CourseProgress {
   weeks: WeekPoint[];
   level_history: { at: string; section: string; from_level: number; to_level: number }[];
   message: string;
+  concepts: Concept[];
 }
 
 export interface Progress {

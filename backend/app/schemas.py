@@ -85,6 +85,8 @@ class DocumentOut(BaseModel):
     filename: str
     uploaded_at: datetime
     sections: list[SectionSummary]
+    concepts_known: int = 0  # "Ξέρεις ήδη 3 από τις 5 έννοιες αυτού του κεφαλαίου"
+    concepts_total: int = 0
 
 
 # --- study ----------------------------------------------------------------
@@ -239,6 +241,14 @@ class WeekPoint(BaseModel):
     hints_per_question: float | None
 
 
+class ConceptOut(BaseModel):
+    """How well a concept is known, in words only. The probability itself never leaves the server."""
+
+    concept: str
+    label_key: Literal["learning", "almost", "known"]
+    label: str
+
+
 class SectionLevel(BaseModel):
     id: int
     label: str
@@ -267,6 +277,7 @@ class CourseProgress(BaseModel):
     weeks: list[WeekPoint]
     level_history: list[LevelStep]
     message: str
+    concepts: list[ConceptOut] = []
 
 
 class ProgressOut(BaseModel):

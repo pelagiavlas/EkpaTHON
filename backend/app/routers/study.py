@@ -22,7 +22,7 @@ from app.models import (
 )
 from app.routers.courses import get_or_404
 from app.schemas import (
-    AnswerIn, AnswerOut, AttemptOut, EasyOut, FlagsIn, HintOut, KeyPointsOut, LastStrategy, LevelIn, MilestoneOut,
+    AnswerIn, AnswerOut, AttemptOut, ConceptOut, EasyOut, FlagsIn, HintOut, KeyPointsOut, LastStrategy, LevelIn, MilestoneOut,
     NoteIn, NoteOut, OptionOut, PickIn, PickOut, QuestionOut, QuestionsOut, SelfCheckIn, StudyOut, SupportOut, VisitOut,
 )
 
@@ -205,9 +205,12 @@ def start_attempt(question_id: int, exam: bool = False, session: Session = Depen
     section = session.get(Section, question.section_id)
     doc, course = _context(session, section)
     level = service.support(session, section.id).level
+    content = content_of(question)
+    open_question = exam or mode_for(level) == "open"
     attempt = Attempt(
         question_id=question.id, section_id=section.id, course_id=course.id, document_id=doc.id,
-        level=level, mode="exam" if exam else "question",
+        level=level, mode="exam" if exam else "question", concept=content.concept,
+        shown_options=0 if open_question else len(shown_option_ids(question.id, content, level)),
     )
     session.add(attempt)
     milestones: list[MilestoneOut] = []
@@ -325,7 +328,7 @@ def pick_sentence(attempt_id: int, body: PickIn, session: Session = Depends(get_
         session.commit()
         return PickOut(correct=True, message="Τη βρήκες. Τώρα απάντησε την ερώτηση.", new_milestones=milestones)
 
-    _, search = load_config()
+    search = load_config().search
     attempt.wrong_picks += 1
     session.add(attempt)
     if attempt.wrong_picks >= search.max_wrong_picks:
@@ -346,12 +349,14 @@ def _finish(session: Session, attempt: Attempt, correct: bool) -> tuple:
     session.flush()
     milestones: list[MilestoneOut] = []
     proposal = None
-    if attempt.mode == "exam":
+    service.record_evidence(session, attempt)  # knowledge tracing (not for self-check or key points)
+    session.flush()
+    if attempt.mode == "exam":  # practice updates what is known, but never proposes a change by itself
         milestones += service.award(session, "first_exam", attempt.section_id)
     else:
         if correct and attempt.mode == "question" and not (attempt.hints_used or attempt.search_steps or attempt.wrong_tries):
             milestones += service.award(session, "first_no_help", attempt.section_id)
-        proposal = service.proposal_out(service.update_proposal(session, attempt.section_id))
+        proposal = service.proposal_out(service.update_proposal(session, attempt.section_id, attempt.concept))
     session.commit()
     return proposal, milestones
 
@@ -427,6 +432,15 @@ def flags(attempt_id: int, body: FlagsIn, session: Session = Depends(get_session
         attempt.opened_section = True
     session.add(attempt)
     session.commit()
+
+
+@router.get("/sections/{section_id}/concepts", response_model=list[ConceptOut])
+def section_concepts(section_id: int, session: Session = Depends(get_session)):
+    """Concepts of this section the student has already met, in words only."""
+    section = get_or_404(session, Section, section_id, "Δεν βρέθηκε η ενότητα")
+    _, course = _context(session, section)
+    rows = [service.mastery(session, course.id, c, create=False) for c in service.section_concepts(section)]
+    return [service.concept_out(r) for r in rows if r is not None and r.observations > 0]
 
 
 # --- level 4: key points and own questions -------------------------------------------

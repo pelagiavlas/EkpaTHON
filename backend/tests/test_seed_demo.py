@@ -38,5 +38,8 @@ def test_live_upload_after_demo_offers_level_3_for_known_topics(client, engine, 
     by_number = {s["number"]: s for s in doc["sections"]}
     assert {by_number[n]["level"] for n in ("3.1", "3.2", "3.3", "3.4")} == {1}  # nothing applied silently
     assert by_number["3.1"]["has_proposal"] and by_number["3.2"]["has_proposal"]
+    support = client.get(f"/api/sections/{by_number['3.2']['id']}/support").json()["proposal"]
+    assert support["reason"] == "known_start" and support["to_level"] == 3
+    assert (doc["concepts_known"], doc["concepts_total"]) == (4, 6)
     assert not by_number["3.3"]["has_proposal"] and not by_number["3.4"]["has_proposal"]
     assert client.get(f"/api/sections/{by_number['3.4']['id']}/study").json()["demo"] is True

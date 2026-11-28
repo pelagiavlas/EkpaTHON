@@ -7,12 +7,12 @@ import {
 import { api, errorText } from "../api";
 import { Screen } from "../components/Screen";
 import { EasyBlocks, blockSpeech, visibleBlocks } from "../components/Blocks";
-import { LEVELS, Loading, Notice, Pictogram } from "../components/common";
+import { ConceptList, LEVELS, Loading, Notice, Pictogram } from "../components/common";
 import { MilestoneNotes, OriginalText, SectionProposal } from "../components/Support";
 import { useSettings } from "../settings";
 import { useSpeech } from "../speech";
 import type {
-  AnswerResult, Hint, Milestone, Note, Option, PickResult, Proposal, Question, Questions, Study, Support,
+  AnswerResult, Concept, Hint, Milestone, Note, Option, PickResult, Proposal, Question, Questions, Study, Support,
 } from "../types";
 import { useLoad } from "../useLoad";
 
@@ -164,11 +164,18 @@ function QuestionsFlow({ sectionId }: { sectionId: string }) {
 function Finished({ data, study, back }: { data: Questions; study: Study | null; back: string }) {
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const concepts = useLoad<Concept[]>(`/sections/${data.section_id}/concepts`);
   const text = data.questions.length ? "Τελείωσες τις ερωτήσεις αυτής της ενότητας." : "Αυτή η ενότητα δεν έχει ερωτήσεις.";
   const next = study?.next_id;
   return (
     <Screen title="Τέλος ερωτήσεων" back={back} autoRead={settings.autoRead} listen={[{ text }]}>
       <Notice tone="success" icon={CircleCheck}><p>{text}</p></Notice>
+      {concepts.data && concepts.data.length > 0 && (
+        <section aria-labelledby="concepts-title">
+          <h2 id="concepts-title">Οι έννοιες αυτής της ενότητας</h2>
+          <ConceptList concepts={concepts.data} />
+        </section>
+      )}
       <div className="actions">
         {next ? (
           <button type="button" className="btn btn-primary" onClick={() => navigate(`/sections/${next}`)}>
