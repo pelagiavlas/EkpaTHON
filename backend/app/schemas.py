@@ -119,6 +119,8 @@ class StudyOut(BaseModel):
     original: list[str]
     easy: EasyOut
     demo: bool  # DEMO_MODE=true: the level preview for the presentation is offered
+    review_status: str = "ai_draft"  # "reviewed": checked by a person
+    reviewed_by: str | None = None
 
 
 class VisitOut(BaseModel):
@@ -291,12 +293,17 @@ class ProgressOut(BaseModel):
     message: str
     courses: list[CourseProgress]
     milestones: list[MilestoneOut]
+    scope: str | None = None  # only on the supporter's view: "course" or "section"
 
 
 # --- supporter ------------------------------------------------------------
 
+SupporterScope = Literal["course", "section"]
+
+
 class SupporterIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
+    scope: SupporterScope = "course"  # the smaller view is the default
 
 
 class SupporterOut(BaseModel):
@@ -305,6 +312,58 @@ class SupporterOut(BaseModel):
     token: str
     created_at: datetime
     active: bool
+    scope: str
+
+
+class ScopeIn(BaseModel):
+    scope: SupporterScope
+
+
+class SupporterCheckOut(BaseModel):
+    """«Θέλεις ο υποστηρικτής σου να βλέπει λιγότερα;» - asked every 4 weeks."""
+
+    id: int
+    name: str
+    scope: str
+
+
+# --- first use and the start guide ---------------------------------------------
+
+class StartOut(BaseModel):
+    choice: str | None  # None: the question has not been answered yet
+    step: int
+    done: bool
+
+
+class StartIn(BaseModel):
+    choice: Literal["with_help", "alone"]
+
+
+class StartStepIn(BaseModel):
+    step: int = Field(ge=1, le=4)
+    done: bool = False
+
+
+class PracticeQuestionOut(BaseModel):
+    prompt: str
+    options: list[str]
+    hints: list[str]
+
+
+class PracticeOut(BaseModel):
+    title: str
+    blocks: list[Block]
+    glossary: list[GlossaryEntry]
+    question: PracticeQuestionOut
+
+
+class PracticeAnswerIn(BaseModel):
+    option: str = Field(min_length=1, max_length=200)
+
+
+class PracticeAnswerOut(BaseModel):
+    correct: bool
+    message: str
 
 
 # --- eClass and "Σήμερα" -------------------------------------------------------
@@ -359,6 +418,8 @@ class TodayOut(BaseModel):
     before: BeforeClassOut | None
     after: AfterClassOut | None
     new_material: list[NewMaterialOut]
+    start: StartOut
+    supporter_checks: list[SupporterCheckOut] = []
 
 
 class ConfirmIn(BaseModel):

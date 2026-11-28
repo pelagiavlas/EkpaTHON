@@ -321,13 +321,28 @@ def test_progress_shows_levels_per_section(setup):
 def test_supporter_sees_levels_not_answers_and_can_be_revoked(setup):
     client, _, _, sections = setup
     answer_right(client, sections["3.1"], 0)
-    supporter = client.post("/api/supporters", json={"name": "Ελένη"}).json()
+    supporter = client.post("/api/supporters", json={"name": "Ελένη", "scope": "section"}).json()
     shared = client.get(f"/api/shared/{supporter['token']}").json()
-    assert shared["courses"][0]["chapters"][0]["sections"]
+    assert shared["scope"] == "section" and shared["courses"][0]["chapters"][0]["sections"]
     assert shared["milestones"] == []
     assert "χρειάστηκες" not in json.dumps(shared, ensure_ascii=False)
     client.delete(f"/api/supporters/{supporter['id']}")
     assert client.get(f"/api/shared/{supporter['token']}").status_code == 404
+
+
+def test_supporter_sees_only_courses_by_default_and_student_can_change_it(setup):
+    client, _, _, sections = setup
+    set_level(client, sections["3.2"], 3)
+    answer_right(client, sections["3.1"], 0, hints=1)
+    supporter = client.post("/api/supporters", json={"name": "Ελένη"}).json()
+    assert supporter["scope"] == "course"
+    course = client.get(f"/api/shared/{supporter['token']}").json()["courses"][0]
+    assert course["message"] and course["weeks"][1]["questions"] == 1
+    assert course["chapters"] == course["days"] == course["level_history"] == course["concepts"] == []
+    more = client.put(f"/api/supporters/{supporter['id']}/scope", json={"scope": "section"}).json()
+    assert more["scope"] == "section"
+    assert client.get(f"/api/shared/{supporter['token']}").json()["courses"][0]["chapters"]
+    assert client.put(f"/api/supporters/{supporter['id']}/scope", json={"scope": "all"}).status_code == 422
 
 
 def test_strategy_question_at_level_3(setup):
@@ -358,7 +373,8 @@ def test_self_checked_answers_do_not_update_bkt(setup, engine):
     set_level(client, sections["3.4"], 3)
     _, _, attempt = start(client, sections["3.4"])
     client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν είμαι σίγουρος"})
-    client.post(f"/api/attempts/{attempt}/self-check", json={"close": True})
+    assert client.post(f"/api/attempts/{attempt}/answer", json={"text": "κάτι αλλάζει"}).json()["outcome"] == "self_check"
+    assert client.post(f"/api/attempts/{attempt}/self-check", json={"close": True}).json()["done"]
     row = known(engine, "μέγεθος δείγματος")
     assert row is None or row.observations == 0
 
@@ -395,3 +411,65 @@ def test_students_never_get_probabilities(setup):
     assert concepts == [{"concept": "μέγεθος δείγματος", "label_key": "learning", "label": "Το μαθαίνεις"}]
     progress = json.dumps(client.get("/api/progress").json())
     assert "p_known" not in progress and "0.52" not in progress
+
+
+# --- open answers: try again first, self-check later (mentor feedback) ---------------------
+
+def open_attempt(client, sections, level=3):
+    set_level(client, sections["3.4"], level)
+    return start(client, sections["3.4"])[2]
+
+
+def test_first_unmatched_open_answer_is_try_again_without_the_key_point(setup):
+    client, _, _, sections = setup
+    attempt = open_attempt(client, sections)
+    r = client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν ξέρω"}).json()
+    assert r == {"outcome": "try_again", "message": "Όχι ακόμα. Ζήτησε υπόδειξη ή δοκίμασε ξανά.",
+                 "key_point": None, "done": False, "proposal": None, "new_milestones": []}
+
+
+def test_second_unmatched_open_answer_brings_self_check(setup):
+    client, _, _, sections = setup
+    attempt = open_attempt(client, sections)
+    client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν ξέρω"})
+    r = client.post(f"/api/attempts/{attempt}/answer", json={"text": "κάτι αλλάζει"}).json()
+    assert r["outcome"] == "self_check" and r["key_point"].startswith("Όταν ρωτάς περισσότερους")
+
+
+def test_self_check_right_away_after_all_hints(setup):
+    client, _, _, sections = setup
+    attempt = open_attempt(client, sections)
+    for _ in range(7):  # 3 search steps + 4 explaining hints
+        client.post(f"/api/attempts/{attempt}/hint")
+    r = client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν ξέρω"}).json()
+    assert r["outcome"] == "self_check" and r["key_point"]
+
+
+def test_no_new_answer_while_waiting_for_self_check(setup):
+    client, _, _, sections = setup
+    attempt = open_attempt(client, sections)
+    client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν ξέρω"})
+    client.post(f"/api/attempts/{attempt}/answer", json={"text": "κάτι αλλάζει"})
+    r = client.post(f"/api/attempts/{attempt}/answer", json={"text": "μικραίνει"})
+    assert r.status_code == 409 and r.json()["detail"] == "Πρώτα πες μας αν είναι κοντά σε αυτό που έγραψες."
+
+
+def test_right_after_one_try_again_still_works(setup):
+    client, _, _, sections = setup
+    attempt = open_attempt(client, sections)
+    client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν ξέρω"})
+    assert client.post(f"/api/attempts/{attempt}/answer", json={"text": "μικραίνει"}).json()["outcome"] == "correct"
+
+
+def self_checked_close(client, section_id, index):
+    _, _, attempt = start(client, section_id, index)
+    client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν ξέρω"})
+    client.post(f"/api/attempts/{attempt}/answer", json={"text": "δεν είμαι σίγουρος"})
+    return client.post(f"/api/attempts/{attempt}/self-check", json={"close": True}).json()
+
+
+def test_self_checked_answers_never_count_as_success_for_a_proposal(setup, rules_engine):
+    client, _, _, sections = setup
+    set_level(client, sections["3.4"], 3)
+    results = [self_checked_close(client, sections["3.4"], i % 2) for i in range(4)]
+    assert all(r["proposal"] is None for r in results)

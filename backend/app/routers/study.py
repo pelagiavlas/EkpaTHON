@@ -71,9 +71,11 @@ def study(section_id: int, session: Session = Depends(get_session)):
     siblings = list(session.exec(select(Section.id).where(Section.document_id == doc.id).order_by(Section.position)))
     index = siblings.index(section.id)
     easy = easy_read(session, section)
+    cache = session.get(ContentCache, section.id)
     sup = service.support(session, section.id)
     session.commit()
     return StudyOut(
+        review_status=cache.review_status, reviewed_by=cache.reviewed_by,
         id=section.id, number=section.number, title=section.title,
         document_id=doc.id, document_title=doc.title, course_id=course.id, course_name=course.name,
         support=service.support_out(sup), position=index + 1, total=len(siblings),
@@ -366,6 +368,8 @@ def answer(attempt_id: int, body: AnswerIn, session: Session = Depends(get_sessi
     attempt, question, content = _open_attempt(session, attempt_id)
     if content is None:
         raise HTTPException(409, "Εδώ δεν υπάρχει ερώτηση για απάντηση.")
+    if attempt.awaiting_self_check:
+        raise HTTPException(409, answers.WAITING_SELF_CHECK)
 
     if body.option_id is not None:
         two_choices = {0, 1} if attempt.hints_used >= 3 else set()  # explaining hint 3 shows two choices
@@ -391,9 +395,15 @@ def answer(attempt_id: int, body: AnswerIn, session: Session = Depends(get_sessi
         proposal, ms = _finish(session, attempt, True)
         return AnswerOut(outcome="correct", message=answers.CORRECT, key_point=content.key_point, done=True,
                          proposal=proposal, new_milestones=ms)
-    attempt.awaiting_self_check = True
+    # Not matched by the keywords. The first time: just "try again", the key point stays hidden.
+    # From the second such answer on (or once all hints are used), the student compares with the key point.
+    compare_now = attempt.wrong_tries >= 1 or attempt.hints_used >= len(content.hints)
+    attempt.wrong_tries += 1
+    attempt.awaiting_self_check = compare_now
     session.add(attempt)
     session.commit()
+    if not compare_now:
+        return AnswerOut(outcome="try_again", message=answers.TRY_AGAIN, key_point=None, done=False)
     return AnswerOut(outcome="self_check", message=answers.SELF_CHECK, key_point=content.key_point, done=False)
 
 

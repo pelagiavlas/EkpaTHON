@@ -13,6 +13,10 @@ from sqlmodel import Field, SQLModel
 class Profile(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     settings_json: str = "{}"  # accessibility settings: never changed by a support level
+    # First use: «Θέλεις κάποιος να σε βοηθήσει να ξεκινήσεις;» ("with_help" | "alone"; None = not answered)
+    start_choice: str | None = None
+    start_step: int = 1  # the step of the start guide to continue from (1-4)
+    start_done: bool = False
 
 
 class Course(SQLModel, table=True):
@@ -65,6 +69,10 @@ class ContentCache(SQLModel, table=True):
 
     section_id: int = Field(foreign_key="section.id", primary_key=True)
     easy_json: str
+    # Human review of what a provider (rules, fixtures written with AI, later an LLM) produced.
+    review_status: str = "ai_draft"  # "ai_draft" | "reviewed"
+    reviewed_by: str | None = None  # free text, e.g. "Μονάδα Προσβασιμότητας"
+    reviewed_at: datetime | None = None
 
 
 class Question(SQLModel, table=True):
@@ -174,6 +182,8 @@ class SupporterAccess(SQLModel, table=True):
     token: str = Field(index=True, unique=True)
     created_at: datetime = Field(default_factory=datetime.now)
     revoked_at: datetime | None = None
+    scope: str = "course"  # course: only the picture per course | section: also each section's way of studying
+    ask_less_at: datetime | None = None  # when to ask «...να βλέπει λιγότερα;» again (None = 4 weeks after created_at)
 
 
 class TimetableSlot(SQLModel, table=True):
@@ -207,5 +217,31 @@ class ClassConfirmation(SQLModel, table=True):
     unit_id: int | None = Field(default=None, foreign_key="syllabusunit.id")
     status: str = "done"  # "done" | "unknown" ("Δεν ξέρω": asked again calmly another day)
     asked_on: date | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    simulated: bool = False
+
+
+class ContentReport(SQLModel, table=True):
+    """«Κάτι δεν μου φαίνεται σωστό» / «Δεν ξέρω αυτή τη λέξη». Anonymous: no student is named anywhere."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    section_id: int = Field(foreign_key="section.id", index=True)
+    block_index: int | None = None  # paragraph of the Easy-to-Read text, None = the whole part
+    kind: str  # "unclear" | "wrong" | "missing" | "word"
+    word: str | None = None
+    comment: str | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    simulated: bool = False
+
+
+class WordLookup(SQLModel, table=True):
+    """«Δεν ξέρω αυτή τη λέξη»: the student's own vocabulary list («Οι λέξεις μου»)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    word: str
+    term: str | None = None  # the glossary term it matched
+    gloss: str | None = None
+    section_id: int | None = Field(default=None, foreign_key="section.id")
+    found: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     simulated: bool = False

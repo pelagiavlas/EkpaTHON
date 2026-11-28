@@ -11,6 +11,8 @@ from app.ekpa import service as ekpa
 from app.ekpa.clock import current_time, demo_enabled
 from app.models import ClassConfirmation, Course, SyllabusUnit
 from app.routers.courses import get_or_404
+from app.routers.onboarding import start_out
+from app.routers.progress import get_profile, supporters_to_ask
 from app.routers.study import load_questions
 from app.schemas import ConfirmIn, ConfirmOut, PlanOut, TeachingIn, TodayOut
 
@@ -55,7 +57,8 @@ def today(demo: bool = False, moment: str | None = None, session: Session = Depe
         try_sync(session, now.date())  # demo dates are relative to the demo "today"
     view = ekpa.today_view(session, now, semester_start(now.date()))
     session.commit()
-    return TodayOut(**view, demo=on, simulated_eclass=is_simulated())
+    return TodayOut(**view, demo=on, simulated_eclass=is_simulated(), start=start_out(get_profile(session)),
+                    supporter_checks=supporters_to_ask(session, now))
 
 
 @router.post("/classes/confirm", response_model=ConfirmOut)

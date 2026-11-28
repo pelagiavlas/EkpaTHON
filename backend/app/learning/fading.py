@@ -36,10 +36,11 @@ class Outcome:
     wrong_tries: int = 0
     search: bool = False  # answered at level 3-4
     fell_back: bool = False  # needed the explaining hints after searching
+    self_checked: bool = False  # the student compared with the key point: never a success
 
 
 def is_success(o: Outcome, cfg: FadingConfig) -> bool:
-    if not o.correct or o.wrong_tries:
+    if o.self_checked or not o.correct or o.wrong_tries:
         return False
     if o.search:
         return not o.fell_back
@@ -47,6 +48,8 @@ def is_success(o: Outcome, cfg: FadingConfig) -> bool:
 
 
 def is_struggle(o: Outcome, cfg: FadingConfig) -> bool:
+    if o.self_checked:
+        return not o.correct  # "Όχι ακόμα" is a struggle, "Ναι, είναι κοντά" is neither
     if not o.correct or o.wrong_tries:
         return True
     if o.search:

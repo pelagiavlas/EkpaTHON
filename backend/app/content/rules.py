@@ -138,6 +138,21 @@ def make_questions(section: SectionInput, level: int) -> list[QuestionContent]:
     return questions
 
 
+def normalize_word(word: str) -> str:
+    return re.sub(r"[^\w ]+", "", strip_accents(word)).strip()
+
+
+def explain_word(word: str) -> GlossaryEntry | None:
+    """Look the word up in the general glossary, in any of its forms."""
+    wanted = normalize_word(word)
+    if not wanted:
+        return None
+    for entry in load_glossary():
+        if any(normalize_word(f) == wanted for f in entry["forms"]) or normalize_word(entry["term"]) == wanted:
+            return GlossaryEntry(term=entry["term"], gloss=entry["gloss"])
+    return None
+
+
 def make_hints(question: QuestionContent) -> list[Hint]:
     where = f"στην ενότητα {question.section_number}" if question.section_number else "σε αυτή την ενότητα"
     gloss = question.meta.get("gloss")

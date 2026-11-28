@@ -12,7 +12,7 @@ from pathlib import Path
 
 from app.content import rules
 from app.content.provider import ContentProvider, SectionInput
-from app.content.schema import EasyRead, Fixture, FixtureSection, Hint, QuestionContent
+from app.content.schema import EasyRead, Fixture, FixtureSection, GlossaryEntry, Hint, QuestionContent
 
 FIXTURES_DIR = Path(__file__).parent / "data" / "fixtures"
 
@@ -62,6 +62,16 @@ class MockProvider(ContentProvider):
 
     def make_hints(self, question: QuestionContent) -> list[Hint]:
         return question.hints or rules.make_hints(question)
+
+    def explain_word(self, word: str, section: SectionInput | None = None) -> GlossaryEntry | None:
+        """First the section's own glossary (ready-made content), then the general glossary."""
+        fs = self.find(section) if section else None
+        if fs:
+            wanted = rules.normalize_word(word)
+            for g in fs.glossary:
+                if rules.normalize_word(g.term) == wanted:
+                    return g
+        return rules.explain_word(word)
 
 
 def as_section_input(number: str | None, title: str, paragraphs_json: str) -> SectionInput:

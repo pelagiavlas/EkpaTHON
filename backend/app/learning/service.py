@@ -140,7 +140,8 @@ def update_proposal(session: Session, section_id: int, concept: str | None = Non
         reasons = {"up": "known_up", "down": "concept_down"}
     else:
         outcomes = [
-            Outcome(a.hints_used, bool(a.correct), a.wrong_tries, search=a.level >= SEARCH_FROM_LEVEL, fell_back=a.fell_back)
+            Outcome(a.hints_used, bool(a.correct), a.wrong_tries, search=a.level >= SEARCH_FROM_LEVEL,
+                    fell_back=a.fell_back, self_checked=a.self_checked)
             for a in attempts
         ]
         direction = propose(sup.level, outcomes, config.fading)

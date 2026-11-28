@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlmodel import Session
 
 from app.db import engine, init_db
-from app.routers import courses, progress, study, today
+from app.routers import courses, onboarding, progress, review, study, today, words
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -28,7 +28,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-for module in (courses, study, progress, today):
+for module in (courses, study, progress, today, review, words, onboarding):
     app.include_router(module.router, prefix="/api")
 
 

@@ -41,11 +41,26 @@ class BKTConfig:
 
 
 @dataclass(frozen=True)
+class Features:
+    help_now: bool = True
+    alerts: bool = False
+    forum: bool = False
+
+
+@dataclass(frozen=True)
+class ReviewConfig:
+    aggregate_min_count: int = 5
+    demo_min_count: int = 1
+
+
+@dataclass(frozen=True)
 class Config:
     fading: FadingConfig
     search: SearchConfig
     bkt: BKTConfig
     engine: str = "bkt"  # "bkt" or "rules" (the simple rules of [fading], kept as fallback)
+    features: Features = Features()
+    review: ReviewConfig = ReviewConfig()
 
 
 @lru_cache
@@ -56,4 +71,10 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
         search=SearchConfig(**data.get("search", {})),
         bkt=BKTConfig(**data.get("bkt", {})),
         engine=data.get("engine", {}).get("fading", "bkt"),
+        features=Features(
+            help_now=data.get("features", {}).get("FEATURE_HELP_NOW", True),
+            alerts=data.get("features", {}).get("FEATURE_ALERTS", False),
+            forum=data.get("features", {}).get("FEATURE_FORUM", False),
+        ),
+        review=ReviewConfig(**data.get("review", {})),
     )

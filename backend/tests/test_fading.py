@@ -78,3 +78,11 @@ def test_config_file_loads():
     assert config.fading.up_after_successes == 3 and config.fading.easy_window == 3
     assert config.search.max_wrong_picks == 3
     assert config.engine == "bkt"
+
+
+def test_self_checked_is_never_a_success():
+    close = Outcome(hints_used=0, correct=True, self_checked=True)
+    not_yet = Outcome(hints_used=0, correct=False, self_checked=True)
+    assert not is_success(close, CFG) and not is_struggle(close, CFG)
+    assert is_struggle(not_yet, CFG)
+    assert propose(1, [close] * 3, CFG) is None

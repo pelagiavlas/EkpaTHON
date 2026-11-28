@@ -16,7 +16,7 @@ Until then, choosing this provider raises a clear error instead of calling anyth
 """
 
 from app.content.provider import ContentProvider, SectionInput
-from app.content.schema import EasyRead, Hint, QuestionContent
+from app.content.schema import EasyRead, GlossaryEntry, Hint, QuestionContent
 
 NOT_READY = "Η σύνδεση με LLM δεν έχει γίνει ακόμα. Βάλε CONTENT_PROVIDER=mock."
 
@@ -36,4 +36,9 @@ class LLMProvider(ContentProvider):
     def make_hints(self, question: QuestionContent) -> list[Hint]:
         # Here: ask for the 4 hint steps (where to look, guiding question, two choices,
         # the same idea with ANOTHER everyday example - never the answer itself).
+        raise NotImplementedError(NOT_READY)
+
+    def explain_word(self, word: str, section: SectionInput | None = None) -> GlossaryEntry | None:
+        # Here: ask for a short, simple explanation of `word` as used in the section text.
+        # Return None when unsure: an unexplained word goes to the human reviewer instead.
         raise NotImplementedError(NOT_READY)

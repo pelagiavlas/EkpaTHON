@@ -7,7 +7,7 @@ LLMProvider has the same methods and will be filled in later.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from app.content.schema import EasyRead, Hint, QuestionContent
+from app.content.schema import EasyRead, GlossaryEntry, Hint, QuestionContent
 
 
 @dataclass
@@ -31,3 +31,12 @@ class ContentProvider(ABC):
     @abstractmethod
     def make_hints(self, question: QuestionContent) -> list[Hint]:
         """The 4 hint steps. Step 4 explains the idea with ANOTHER example, never the answer."""
+
+    @abstractmethod
+    def explain_word(self, word: str, section: SectionInput | None = None) -> GlossaryEntry | None:
+        """A simple explanation of a word the student does not know, or None if there is none yet.
+        Never make one up: None is a fine answer (the word then goes to the reviewer)."""
+
+    # Pictures: a provider (also a future LLM) may only PROPOSE a picture that already exists in the
+    # checked library (frontend/public/pictos/library.json). It never creates one. A proposed picture
+    # is shown only after a reviewer approves it (see app/content/images.py).
