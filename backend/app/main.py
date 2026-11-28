@@ -4,8 +4,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
+from sqlmodel import Session
 
-from app.db import init_db
+from app.db import engine, init_db
 from app.routers import courses, progress, study
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
@@ -13,7 +14,10 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    added = init_db()  # also adds new columns to an older database, without deleting anything
+    if ("section", "concepts_json") in added:
+        with Session(engine) as session:
+            courses.backfill_concepts(session)
     yield
 
 

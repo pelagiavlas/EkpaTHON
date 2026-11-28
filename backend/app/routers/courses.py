@@ -57,6 +57,19 @@ def document_out(session: Session, doc: Document) -> DocumentOut:
     )
 
 
+def backfill_concepts(session: Session) -> int:
+    """After an update that added concepts: fill them in for sections uploaded before."""
+    count = 0
+    for s in session.exec(select(Section).where(Section.concepts_json == "[]")):
+        concepts = concepts_of(s.number, s.title, json.loads(s.paragraphs_json))
+        if concepts:
+            s.concepts_json = json.dumps(concepts, ensure_ascii=False)
+            session.add(s)
+            count += 1
+    session.commit()
+    return count
+
+
 def concepts_of(number: str | None, title: str, paragraphs: list[str]) -> list[str]:
     """The concepts the section's questions check (from the content provider)."""
     try:
